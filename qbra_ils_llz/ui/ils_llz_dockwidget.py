@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import pyqtSignal
-from qgis.core import Qgis, QgsProject
+from qgis.core import Qgis, QgsProject, QgsWkbTypes
 from qgis.utils import iface
 import os
 
@@ -24,9 +24,24 @@ class IlsLlzDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def _populate_layer_combos(self):
         self.comboRouting.clear()
         self.comboNavaid.clear()
+        root = QgsProject.instance().layerTreeRoot()
         for lyr in QgsProject.instance().mapLayers().values():
-            self.comboRouting.addItem(lyr.name(), lyr)
-            self.comboNavaid.addItem(lyr.name(), lyr)
+            node = root.findLayer(lyr.id())
+            is_visible = node is None or node.isVisible()
+            if not is_visible:
+                continue
+            # Filter by geometry type: routing = line/polyline; navaid = point
+            gtype = lyr.geometryType()
+            if gtype == QgsWkbTypes.LineGeometry:
+                self.comboRouting.addItem(lyr.name(), lyr)
+            if gtype == QgsWkbTypes.PointGeometry:
+                self.comboNavaid.addItem(lyr.name(), lyr)
+        # Fallback: set active layer if present
+        if iface.activeLayer() is not None:
+            active = iface.activeLayer()
+            idx = self.comboNavaid.findText(active.name())
+            if idx >= 0:
+                self.comboNavaid.setCurrentIndex(idx)
 
     def _on_close(self):
         try:
@@ -47,6 +62,12 @@ class IlsLlzDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             navaid_layer = self._selected_layer(self.comboNavaid)
             if routing_layer is None or navaid_layer is None:
                 raise RuntimeError('Select both routing and navaid layers.')
+            # Re-check visibility (active-only UX)
+            root = QgsProject.instance().layerTreeRoot()
+            for lyr in (routing_layer, navaid_layer):
+                node = root.findLayer(lyr.id())
+                if node and not node.isVisible():
+                    raise RuntimeError(f'Layer "{lyr.name()}" is not visible (active) in the map.')
 
             # Respect Selected Only flags
             routing_selection = routing_layer.selectedFeatures() if self.checkRoutingSelected.isChecked() else list(routing_layer.getFeatures())
