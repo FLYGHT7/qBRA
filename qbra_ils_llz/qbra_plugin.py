@@ -14,7 +14,7 @@ class QbraIlsLlzPlugin:
         return QCoreApplication.translate('QbraIlsLlzPlugin', message)
 
     def initGui(self):
-        icon_path = os.path.join(self.plugin_dir, 'resources', 'icon.svg')
+        icon_path = os.path.join(self.plugin_dir, 'resources', 'icon.png')
         self.action = QAction(QIcon(icon_path), self.tr('ILS LLZ (Single Freq)'), self.iface.mainWindow())
         self.action.setToolTip(self.tr('Abrir panel ILS/LLZ'))
         self.action.triggered.connect(self.run)
