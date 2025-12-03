@@ -1,0 +1,19 @@
+[general]
+name=qBRA ILS LLZ (Single Frequency)
+qgisMinimumVersion=3.22
+qgisMaximumVersion=3.999
+version=0.1.0
+author=andures
+email=
+description=Plugin para ejecutar el cálculo ILS LLZ de una sola frecuencia desde QGIS.
+about=Ejecuta el script de ILS LLZ con una interfaz simple.
+tracker=
+repository=
+homepage=
+category=Analysis
+icon=resources/icon.png
+experimental=True
+deprecated=False
+
+[about]
+changes=Primera versión: estructura base y stub de ejecución.

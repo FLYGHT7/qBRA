@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/qbra_ils_llz">
+    <file>icon.png</file>
+  </qresource>
+</RCC>
