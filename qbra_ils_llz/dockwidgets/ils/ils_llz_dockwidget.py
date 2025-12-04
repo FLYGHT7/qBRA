@@ -1,7 +1,7 @@
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
-from qgis.core import QgsWkbTypes, QgsPoint
+from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
 from qgis.utils import iface
 
 import os
@@ -45,7 +45,10 @@ class IlsLlzDockWidget(QDockWidget):
         """
         self._widget.cboNavaidLayer.clear()
         self._widget.cboRoutingLayer.clear()
-        for layer in self.iface.mapCanvas().layers():
+        # Use all project layers (not only those in canvas), only vector layers
+        for layer in QgsProject.instance().mapLayers().values():
+            if not isinstance(layer, QgsVectorLayer):
+                continue
             name = layer.name()
             gtype = QgsWkbTypes.geometryType(layer.wkbType())
 
@@ -59,7 +62,7 @@ class IlsLlzDockWidget(QDockWidget):
 
         # Default navaid: current active layer if it is a point layer
         al = iface.activeLayer()
-        if al:
+        if al and isinstance(al, QgsVectorLayer):
             gtype = QgsWkbTypes.geometryType(al.wkbType())
             if gtype == QgsWkbTypes.PointGeometry:
                 idx = self._widget.cboNavaidLayer.findText(al.name())
