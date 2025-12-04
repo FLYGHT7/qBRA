@@ -120,25 +120,50 @@
     </widget>
    </item>
    <item>
-   <widget class="QPushButton" name="btnDirection">
-    <property name="text">
-     <string>Direction: Start to End</string>
-    </property>
-   </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="btnCalculate">
-     <property name="text">
-      <string>Calculate</string>
+    <layout class="QHBoxLayout" name="layoutButtons">
+     <property name="spacing">
+      <number>6</number>
      </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="btnClose">
-     <property name="text">
-      <string>Close</string>
-     </property>
-    </widget>
+     <item>
+      <widget class="QPushButton" name="btnDirection">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="text">
+        <string>Direction: Start to End</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnCalculate">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="text">
+        <string>Calculate</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnClose">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="text">
+        <string>Close</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
      <item>
         <spacer name="verticalSpacer">
