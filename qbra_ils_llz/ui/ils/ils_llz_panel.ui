@@ -41,7 +41,10 @@
     </widget>
    </item>
    <item>
-    <widget class="QFrame" name="frameInputs">
+    <widget class="QGroupBox" name="grpInputLayers">
+     <property name="title">
+      <string>Input Layers</string>
+     </property>
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
      </property>
@@ -51,7 +54,7 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
-     <layout class="QFormLayout" name="formLayout">
+     <layout class="QFormLayout" name="formInputLayers">
       <property name="horizontalSpacing">
        <number>4</number>
       </property>
@@ -78,38 +81,53 @@
       <item row="1" column="1">
        <widget class="QComboBox" name="cboRoutingLayer"/>
       </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="lblSiteElev">
-           <property name="text">
-            <string>Site elevation (m)</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QDoubleSpinBox" name="spnSiteElev">
-           <property name="minimum">
-            <double>-1000.000000000000000</double>
-           </property>
-           <property name="maximum">
-            <double>10000.000000000000000</double>
-           </property>
-           <property name="decimals">
-            <number>2</number>
-           </property>
-           <property name="value">
-            <double>0.000000000000000</double>
-           </property>
-          </widget>
-         </item>
      </layout>
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="btnDirection">
-     <property name="text">
-      <string>Forward</string>
+    <widget class="QGroupBox" name="grpParameters">
+     <property name="title">
+      <string>Parameters</string>
      </property>
+     <layout class="QFormLayout" name="formParameters">
+      <property name="horizontalSpacing">
+       <number>4</number>
+      </property>
+      <property name="verticalSpacing">
+       <number>4</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QLabel" name="lblSiteElev">
+        <property name="text">
+         <string>Site elevation (m)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="spnSiteElev">
+        <property name="minimum">
+         <double>-1000.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>10000.000000000000000</double>
+        </property>
+        <property name="decimals">
+         <number>2</number>
+        </property>
+        <property name="value">
+         <double>0.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
+   </item>
+   <item>
+   <widget class="QPushButton" name="btnDirection">
+    <property name="text">
+     <string>Direction: Start to End</string>
+    </property>
+   </widget>
    </item>
    <item>
     <widget class="QPushButton" name="btnCalculate">
