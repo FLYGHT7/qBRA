@@ -1,7 +1,7 @@
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
-from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
+from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer
 from qgis.utils import iface
 
 import os
@@ -45,8 +45,8 @@ class IlsLlzDockWidget(QDockWidget):
         """
         self._widget.cboNavaidLayer.clear()
         self._widget.cboRoutingLayer.clear()
-        # Use all project layers (not only those in canvas), only vector layers
-        for layer in QgsProject.instance().mapLayers().values():
+        for layer in self.iface.mapCanvas().layers():
+            # Skip non-vector layers (e.g., rasters) to avoid calling wkbType on them
             if not isinstance(layer, QgsVectorLayer):
                 continue
             name = layer.name()
