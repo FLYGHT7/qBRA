@@ -1,7 +1,7 @@
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
-from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer
+from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
 from qgis.utils import iface
 
 import os
@@ -49,20 +49,23 @@ class IlsLlzDockWidget(QDockWidget):
         """
         self._widget.cboNavaidLayer.clear()
         self._widget.cboRoutingLayer.clear()
-        for layer in self.iface.mapCanvas().layers():
-            # Skip non-vector layers (e.g., rasters) to avoid calling wkbType on them
-            if not isinstance(layer, QgsVectorLayer):
-                continue
-            name = layer.name()
-            gtype = QgsWkbTypes.geometryType(layer.wkbType())
-
-            # Any line layer can be used as routing/runway
-            if gtype == QgsWkbTypes.LineGeometry:
-                self._widget.cboRoutingLayer.addItem(name, layer)
-
-            # Any point layer can be used as navaid
-            if gtype == QgsWkbTypes.PointGeometry:
-                self._widget.cboNavaidLayer.addItem(name, layer)
+        # Collect layers via the layer tree to include layers inside groups
+        root = QgsProject.instance().layerTreeRoot()
+        def visit(node):
+            for child in node.children():
+                if child.nodeType() == child.NodeLayer:
+                    layer = child.layer()
+                    if not isinstance(layer, QgsVectorLayer):
+                        continue
+                    name = layer.name()
+                    gtype = QgsWkbTypes.geometryType(layer.wkbType())
+                    if gtype == QgsWkbTypes.LineGeometry:
+                        self._widget.cboRoutingLayer.addItem(name, layer)
+                    if gtype == QgsWkbTypes.PointGeometry:
+                        self._widget.cboNavaidLayer.addItem(name, layer)
+                elif child.nodeType() == child.NodeGroup:
+                    visit(child)
+        visit(root)
 
         # Default navaid: current active layer if it is a point layer
         al = iface.activeLayer()
