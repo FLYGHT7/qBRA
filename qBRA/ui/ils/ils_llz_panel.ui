@@ -41,6 +41,25 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="grpFacility">
+     <property name="title">
+      <string>Directional Facility</string>
+     </property>
+     <layout class="QFormLayout" name="formFacility">
+      <item row="0" column="0">
+       <widget class="QLabel" name="lblFacility">
+        <property name="text">
+         <string>Type</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="cboFacility"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
    <widget class="QGroupBox" name="grpInputLayers">
      <property name="title">
       <string>Input Layers</string>
@@ -114,6 +133,112 @@
         <property name="value">
          <double>0.000000000000000</double>
         </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="lblA">
+        <property name="text">
+         <string>A (m)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="spnA">
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>100000.000000000000000</double></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="value"><double>0.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="lblB">
+        <property name="text"><string>b (m)</string></property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+      <widget class="QDoubleSpinBox" name="spnB">
+       <property name="minimum"><double>0.000000000000000</double></property>
+       <property name="maximum"><double>100000.000000000000000</double></property>
+       <property name="decimals"><number>2</number></property>
+       <property name="value"><double>0.000000000000000</double></property>
+      </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="lblh">
+        <property name="text"><string>h (m)</string></property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QDoubleSpinBox" name="spnh">
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>100000.000000000000000</double></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="value"><double>70.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="lblr">
+        <property name="text"><string>r (m)</string></property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QDoubleSpinBox" name="spnr">
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>100000.000000000000000</double></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="value"><double>6000.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="lblD">
+        <property name="text"><string>D (m)</string></property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QDoubleSpinBox" name="spnD">
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>100000.000000000000000</double></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="value"><double>600.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="lblH">
+        <property name="text"><string>H (m)</string></property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <widget class="QDoubleSpinBox" name="spnH">
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>100000.000000000000000</double></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="value"><double>20.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="7" column="0">
+       <widget class="QLabel" name="lblL">
+        <property name="text"><string>L (m)</string></property>
+       </widget>
+      </item>
+      <item row="7" column="1">
+       <widget class="QDoubleSpinBox" name="spnL">
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>100000.000000000000000</double></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="value"><double>1500.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="8" column="0">
+       <widget class="QLabel" name="lblPhi">
+        <property name="text"><string>ϕ (deg)</string></property>
+       </widget>
+      </item>
+      <item row="8" column="1">
+       <widget class="QDoubleSpinBox" name="spnPhi">
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>90.000000000000000</double></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="value"><double>40.000000000000000</double></property>
        </widget>
       </item>
      </layout>
