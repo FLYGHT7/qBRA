@@ -20,6 +20,7 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget = uic.loadUi(UI_PATH)
         self.setWidget(self._widget)
         self._wire()
+        self._init_facility()
         self.refresh_layers()
 
     def defaultArea(self):
@@ -32,6 +33,68 @@ class IlsLlzDockWidget(QDockWidget):
         # Default direction: start to end
         self._widget.btnDirection.setProperty("direction", "forward")
         self._widget.btnDirection.setText("Direction: Start to End")
+
+    def _init_facility(self):
+        self._facility_defs = {
+            # key: (label, a_depends_threshold, defaults)
+            "LOC": ("ILS LLZ – single frequency", True, {"b": 500, "h": 70, "D": 500, "H": 10, "L": 2300, "phi": 30, "r_expr": "a+6000"}),
+            "LOCII": ("ILS LLZ – dual frequency", True, {"b": 500, "h": 70, "D": 500, "H": 20, "L": 1500, "phi": 20, "r_expr": "a+6000"}),
+            "GP": ("ILS GP M-Type (dual)", False, {"a": 800, "b": 50, "h": 70, "D": 250, "H": 5, "L": 325, "phi": 10, "r": 6000}),
+            "DME": ("DME (directional)", True, {"b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r_expr": "a+6000"}),
+        }
+        cb = self._widget.cboFacility
+        cb.clear()
+        for key, (label, _dep, _defs) in self._facility_defs.items():
+            cb.addItem(label, key)
+        cb.currentIndexChanged.connect(self._apply_facility_defaults)
+        # Update r when A changes for types where r depends on a
+        self._widget.spnA.valueChanged.connect(self._maybe_update_r)
+        # Set initial
+        cb.setCurrentIndex(0)
+        self._apply_facility_defaults()
+
+    def _maybe_update_r(self):
+        key = self._widget.cboFacility.currentData()
+        defs = self._facility_defs.get(key, (None, False, {}))[2]
+        r_expr = defs.get("r_expr")
+        if r_expr == "a+6000":
+            a = float(self._widget.spnA.value())
+            self._widget.spnr.setValue(a + 6000.0)
+
+    def _apply_facility_defaults(self):
+        key = self._widget.cboFacility.currentData()
+        label, a_dep, defs = self._facility_defs.get(key, ("", False, {}))
+        # A: if explicitly present in defaults, set; if depends on threshold, try to estimate from routing start
+        if "a" in defs:
+            self._widget.spnA.setValue(float(defs["a"]))
+        else:
+            # try estimate: distance from navaid to routing start/end depending on direction
+            try:
+                nlayer = self._widget.cboNavaidLayer.currentData()
+                rlayer = self._widget.cboRoutingLayer.currentData()
+                nfeat = nlayer.selectedFeatures()[0]
+                rfeat = rlayer.selectedFeatures()[0]
+                geom = rfeat.geometry()
+                pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
+                if not pts or len(pts) < 2:
+                    raise Exception()
+                direction = self._widget.btnDirection.property("direction") or "forward"
+                pick = pts[0] if direction == "forward" else pts[-1]
+                a_val = QgsPoint(pick).distance(QgsPoint(nfeat.geometry().asPoint()))
+                self._widget.spnA.setValue(a_val)
+            except Exception:
+                self._widget.spnA.setValue(0.0)
+        # Other parameters
+        self._widget.spnB.setValue(float(defs.get("b", self._widget.spnB.value())))
+        self._widget.spnh.setValue(float(defs.get("h", self._widget.spnh.value())))
+        self._widget.spnD.setValue(float(defs.get("D", self._widget.spnD.value())))
+        self._widget.spnH.setValue(float(defs.get("H", self._widget.spnH.value())))
+        self._widget.spnL.setValue(float(defs.get("L", self._widget.spnL.value())))
+        self._widget.spnPhi.setValue(float(defs.get("phi", self._widget.spnPhi.value())))
+        if "r" in defs:
+            self._widget.spnr.setValue(float(defs["r"]))
+        else:
+            self._maybe_update_r()
 
     def _toggle_direction(self):
         current = self._widget.btnDirection.property("direction") or "forward"
@@ -135,15 +198,15 @@ class IlsLlzDockWidget(QDockWidget):
         azimuth = start_point.azimuth(end_point)
         print(f"QBRA ILS/LLZ: direction={direction}, azimuth={azimuth}, d0={geom.length()}")
 
-        # Parameters preset for DME case (from legacy script)
-        a = 300
-        b = 20
-        h = 70
-        r = 6000 + a
-        D = 600
-        H = 20
-        L = 1500
-        phi = 40
+        # Parameters come from UI (facility defaults applied on selection)
+        a = float(self._widget.spnA.value())
+        b = float(self._widget.spnB.value())
+        h = float(self._widget.spnh.value())
+        r = float(self._widget.spnr.value())
+        D = float(self._widget.spnD.value())
+        H = float(self._widget.spnH.value())
+        L = float(self._widget.spnL.value())
+        phi = float(self._widget.spnPhi.value())
 
         return {
             "active_layer": navaid_layer,
