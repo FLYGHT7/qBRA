@@ -43,6 +43,7 @@ def build_layers(iface, params):
     phi = params["phi"]
     azimuth = params["azimuth"]
     remark = params["remark"]
+    display_name = params.get("display_name") or remark
     site_elev = params["site_elev"]
 
     side_elev = site_elev + H
@@ -78,7 +79,7 @@ def build_layers(iface, params):
     )
 
     # Memory layer for polygons
-    z_layer = QgsVectorLayer("PolygonZ?crs=" + map_srid, f"{remark} BRA_areas", "memory")
+    z_layer = QgsVectorLayer("PolygonZ?crs=" + map_srid, f"{display_name} BRA_areas", "memory")
     fields = [
         QgsField("id", QVariant.Int),
         QgsField("area", QVariant.String),
@@ -105,7 +106,7 @@ def build_layers(iface, params):
         1,
         "base",
         str(site_elev),
-        remark,
+        display_name,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -125,7 +126,7 @@ def build_layers(iface, params):
         2,
         "left level",
         str(side_elev),
-        remark,
+        display_name,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -145,7 +146,7 @@ def build_layers(iface, params):
         3,
         "right level",
         str(side_elev),
-        remark,
+        display_name,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -180,7 +181,7 @@ def build_layers(iface, params):
         4,
         "slope",
         str(site_elev + h),
-        remark,
+        display_name,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -200,7 +201,7 @@ def build_layers(iface, params):
         5,
         "wall",
         str(side_elev),
-        remark,
+        display_name,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -219,7 +220,7 @@ def build_layers(iface, params):
         6,
         "wall",
         str(side_elev),
-        remark,
+        display_name,
         str(round(a, 2)),
         str(b),
         str(h),

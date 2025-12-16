@@ -208,6 +208,15 @@ class IlsLlzDockWidget(QDockWidget):
         L = float(self._widget.spnL.value())
         phi = float(self._widget.spnPhi.value())
 
+        # Facility type (key) and label for naming
+        facility_key = self._widget.cboFacility.currentData()
+        facility_label = self._widget.cboFacility.currentText()
+
+        # Output naming: user-provided name concatenated with facility label
+        custom_name = (self._widget.txtOutputName.text() or "").strip()
+        base_name = custom_name if custom_name else remark
+        display_name = f"{base_name} - {facility_label}" if facility_label else base_name
+
         return {
             "active_layer": navaid_layer,
             "azimuth": azimuth,
@@ -222,4 +231,7 @@ class IlsLlzDockWidget(QDockWidget):
             "remark": remark,
             "direction": direction,
             "site_elev": site_elev,
+            "facility_key": facility_key,
+            "facility_label": facility_label,
+            "display_name": display_name,
         }
