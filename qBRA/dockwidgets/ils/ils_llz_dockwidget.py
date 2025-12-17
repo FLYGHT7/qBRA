@@ -211,6 +211,15 @@ class IlsLlzDockWidget(QDockWidget):
         facility_key = self._widget.cboFacility.currentData()
         facility_label = self._widget.cboFacility.currentText()
 
+        # Facility type (key) and label for naming
+        facility_key = self._widget.cboFacility.currentData()
+        facility_label = self._widget.cboFacility.currentText()
+
+        # Output naming: user-provided name concatenated with facility label
+        custom_name = (self._widget.txtOutputName.text() or "").strip()
+        base_name = custom_name if custom_name else remark
+        display_name = f"{base_name} - {facility_label}" if facility_label else base_name
+
         return {
             "active_layer": navaid_layer,
             "azimuth": azimuth,
