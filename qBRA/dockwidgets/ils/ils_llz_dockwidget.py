@@ -41,6 +41,9 @@ class IlsLlzDockWidget(QDockWidget):
             "LOCII": ("ILS LLZ – dual frequency", True, {"b": 500, "h": 70, "D": 500, "H": 20, "L": 1500, "phi": 20, "r_expr": "a+6000"}),
             "GP": ("ILS GP M-Type (dual)", False, {"a": 800, "b": 50, "h": 70, "D": 250, "H": 5, "L": 325, "phi": 10, "r": 6000}),
             "DME": ("DME (directional)", True, {"b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r_expr": "a+6000"}),
+            # Omnidirectional facilities (no dependency on routing-derived A)
+            "DME_OMNI": ("DME (omnidirectional)", False, {"a": 0, "b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r": 6000}),
+            "VOR": ("VOR (omnidirectional)", False, {"a": 0, "b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r": 6000}),
         }
         cb = self._widget.cboFacility
         cb.clear()
