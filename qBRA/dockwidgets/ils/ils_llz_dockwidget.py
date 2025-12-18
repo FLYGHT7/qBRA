@@ -232,10 +232,6 @@ class IlsLlzDockWidget(QDockWidget):
         facility_key = self._widget.cboFacility.currentData()
         facility_label = self._widget.cboFacility.currentText()
 
-        # Facility type (key) and label for naming
-        facility_key = self._widget.cboFacility.currentData()
-        facility_label = self._widget.cboFacility.currentText()
-
         # Output naming: user-provided name concatenated with facility label
         custom_name = (self._widget.txtOutputName.text() or "").strip()
         base_name = custom_name if custom_name else remark
@@ -257,4 +253,5 @@ class IlsLlzDockWidget(QDockWidget):
             "site_elev": site_elev,
             "facility_key": facility_key,
             "facility_label": facility_label,
+            "display_name": display_name,
         }
