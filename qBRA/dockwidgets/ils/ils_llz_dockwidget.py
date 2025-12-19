@@ -70,8 +70,11 @@ class IlsLlzDockWidget(QDockWidget):
         else:
             # try estimate: distance from navaid to routing start/end depending on direction
             try:
-                nlayer = self._widget.cboNavaidLayer.currentData()
-                rlayer = self._widget.cboRoutingLayer.currentData()
+                # Resolve via project from stored IDs
+                nlayer_id = self._widget.cboNavaidLayer.currentData()
+                rlayer_id = self._widget.cboRoutingLayer.currentData()
+                nlayer = QgsProject.instance().mapLayer(nlayer_id)
+                rlayer = QgsProject.instance().mapLayer(rlayer_id)
                 nfeat = nlayer.selectedFeatures()[0]
                 rfeat = rlayer.selectedFeatures()[0]
                 geom = rfeat.geometry()
@@ -123,9 +126,9 @@ class IlsLlzDockWidget(QDockWidget):
                     name = layer.name()
                     gtype = QgsWkbTypes.geometryType(layer.wkbType())
                     if gtype == QgsWkbTypes.LineGeometry:
-                        self._widget.cboRoutingLayer.addItem(name, layer)
+                        self._widget.cboRoutingLayer.addItem(name, layer.id())
                     if gtype == QgsWkbTypes.PointGeometry:
-                        self._widget.cboNavaidLayer.addItem(name, layer)
+                        self._widget.cboNavaidLayer.addItem(name, layer.id())
                 elif child.nodeType() == child.NodeGroup:
                     visit(child)
         visit(root)
@@ -141,8 +144,11 @@ class IlsLlzDockWidget(QDockWidget):
 
 
     def get_parameters(self):
-        navaid_layer = self._widget.cboNavaidLayer.currentData()
-        routing_layer = self._widget.cboRoutingLayer.currentData()
+        # Retrieve stored layer IDs and resolve to actual layers
+        navaid_layer_id = self._widget.cboNavaidLayer.currentData()
+        routing_layer_id = self._widget.cboRoutingLayer.currentData()
+        navaid_layer = QgsProject.instance().mapLayer(navaid_layer_id) if navaid_layer_id else None
+        routing_layer = QgsProject.instance().mapLayer(routing_layer_id) if routing_layer_id else None
         # Basic presence validation with debug logs
         if not navaid_layer:
             print("QBRA ILS/LLZ: no navaid layer selected")
