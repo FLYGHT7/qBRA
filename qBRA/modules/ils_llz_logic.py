@@ -10,6 +10,7 @@ from qgis.core import (
     QgsPolygon,
     QgsLineString,
 )
+from math import tan, radians, cos, sin, pi
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
 
@@ -270,3 +271,137 @@ def build_layers(iface, params):
     z_layer.updateExtents()
 
     return z_layer
+
+
+def build_layers_omni(iface, params):
+    """
+    Build omnidirectional BRA shapes as 2D footprints:
+    - Inner cylinder: circle of radius r
+    - Outer cone footprint: circle of radius R
+    - Optional turbine analysis cylinder: circle of radius j
+    Attributes include r, alpha, R, j, h and type (last column).
+    """
+    layer = params["active_layer"]
+    selection = layer.selectedFeatures()
+    if not selection:
+        raise ValueError("Select one feature on the active layer")
+    feat = selection[0]
+    p_geom = feat.geometry().asPoint()
+
+    map_srid = iface.mapCanvas().mapSettings().destinationCrs().authid()
+
+    display_name = params.get("display_name") or params.get("remark") or "BRA"
+    r = float(params.get("omni_r", 0.0))
+    alpha = float(params.get("omni_alpha", 1.0))
+    R = float(params.get("omni_R", 0.0))
+    turbine = bool(params.get("omni_turbine", False))
+    j = float(params.get("omni_j", 0.0)) if turbine else 0.0
+    h = float(params.get("omni_h", 0.0)) if turbine else 0.0
+    base_z = float(params.get("site_elev", 0.0))
+
+    if r <= 0 or R <= 0:
+        raise ValueError("Omni parameters invalid: r and R must be > 0")
+    if R < r:
+        raise ValueError("Omni parameter invalid: R must be >= r")
+    if alpha <= 0 or alpha > 90:
+        raise ValueError("Omni parameter invalid: alpha must be in (0, 90]")
+    if turbine:
+        if j <= 0 or h <= 0:
+            raise ValueError("Omni turbine parameters invalid: j and h must be > 0")
+        if j < r:
+            raise ValueError("Omni turbine parameter invalid: j must be >= r")
+
+    # Heights from cone geometry (Figure 2.1/2.2): z = radius * tan(alpha)
+    alpha_rad = radians(alpha)
+    h_cone_outer = R * tan(alpha_rad)
+    h_cone_inner = r * tan(alpha_rad)
+
+    segments = 128
+
+    # Create memory layer for 3D polygons
+    layer_out = QgsVectorLayer("PolygonZ?crs=" + map_srid, f"{display_name} BRA_omni", "memory")
+    fields = [
+        QgsField("id", QVariant.Int),
+        QgsField("area", QVariant.String),
+        QgsField("area_name", QVariant.String),
+        QgsField("r", QVariant.String),
+        QgsField("alpha", QVariant.String),
+        QgsField("R", QVariant.String),
+        QgsField("j", QVariant.String),
+        QgsField("h", QVariant.String),
+        QgsField("type", QVariant.String),
+    ]
+    pr = layer_out.dataProvider()
+    pr.addAttributes(fields)
+    layer_out.updateFields()
+
+    _type_value = params.get("facility_label") or params.get("facility_key") or ""
+
+    def circle_points(center_pt, radius, z_value):
+        pts = []
+        cx = center_pt.x()
+        cy = center_pt.y()
+        for i in range(segments):
+            ang = 2.0 * pi * i / segments
+            x = cx + radius * cos(ang)
+            y = cy + radius * sin(ang)
+            pts.append(QgsPoint(x, y, z_value + base_z))
+        pts.append(pts[0])
+        return pts
+
+    # Inner cylinder top (flat disk at z = h_cone_inner)
+    inner_ring = circle_points(p_geom, r, h_cone_inner)
+    f1 = QgsFeature()
+    f1.setGeometry(QgsGeometry(QgsPolygon(QgsLineString(inner_ring), rings=[])))
+    f1.setAttributes([
+        1,
+        "inner cylinder top",
+        display_name,
+        str(r),
+        str(alpha),
+        str(R),
+        str(j if turbine else 0.0),
+        str(h if turbine else 0.0),
+        _type_value,
+    ])
+    pr.addFeatures([f1])
+
+    # Cone mantle approximated as polygon with outer ring at z=h_cone_outer and inner ring at z=h_cone_inner
+    outer_ring = circle_points(p_geom, R, h_cone_outer)
+    inner_ring_cone = circle_points(p_geom, r, h_cone_inner)[::-1]  # reverse for hole
+    f2 = QgsFeature()
+    f2.setGeometry(QgsGeometry(QgsPolygon(QgsLineString(outer_ring), rings=[QgsLineString(inner_ring_cone)])))
+    f2.setAttributes([
+        2,
+        "cone mantle",
+        display_name,
+        str(r),
+        str(alpha),
+        str(R),
+        str(j if turbine else 0.0),
+        str(h if turbine else 0.0),
+        _type_value,
+    ])
+    pr.addFeatures([f2])
+
+    # Optional turbine cylinder top at height h
+    if turbine and j > 0:
+        turbine_ring = circle_points(p_geom, j, h)
+        f3 = QgsFeature()
+        f3.setGeometry(QgsGeometry(QgsPolygon(QgsLineString(turbine_ring), rings=[])))
+        f3.setAttributes([
+            3,
+            "turbine cylinder top",
+            display_name,
+            str(r),
+            str(alpha),
+            str(R),
+            str(j),
+            str(h),
+            _type_value,
+        ])
+        pr.addFeatures([f3])
+
+    layer_out.triggerRepaint()
+    layer_out.updateExtents()
+    return layer_out

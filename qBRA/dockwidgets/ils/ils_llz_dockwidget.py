@@ -20,7 +20,7 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget = uic.loadUi(UI_PATH)
         self.setWidget(self._widget)
         self._wire()
-        self._init_facility()
+        self._init_mode_and_facilities()
         self.refresh_layers()
 
     def defaultArea(self):
@@ -34,28 +34,75 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget.btnDirection.setProperty("direction", "forward")
         self._widget.btnDirection.setText("Direction: Start to End")
 
-    def _init_facility(self):
-        self._facility_defs = {
+    def _init_mode_and_facilities(self):
+        # Directional facilities
+        self._facility_defs_dir = {
             # key: (label, a_depends_threshold, defaults)
             "LOC": ("ILS LLZ – single frequency", True, {"b": 500, "h": 70, "D": 500, "H": 10, "L": 2300, "phi": 30, "r_expr": "a+6000"}),
             "LOCII": ("ILS LLZ – dual frequency", True, {"b": 500, "h": 70, "D": 500, "H": 20, "L": 1500, "phi": 20, "r_expr": "a+6000"}),
             "GP": ("ILS GP M-Type (dual)", False, {"a": 800, "b": 50, "h": 70, "D": 250, "H": 5, "L": 325, "phi": 10, "r": 6000}),
             "DME": ("DME (directional)", True, {"b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r_expr": "a+6000"}),
         }
-        cb = self._widget.cboFacility
-        cb.clear()
-        for key, (label, _dep, _defs) in self._facility_defs.items():
-            cb.addItem(label, key)
-        cb.currentIndexChanged.connect(self._apply_facility_defaults)
-        # Update r when A changes for types where r depends on a
+        # Omnidirectional facilities presets (initial set)
+        self._facility_defs_omni = {
+            # key: (label, defaults for r, alpha, R, optional j/h)
+            "OMNI_DME_N": ("DME N (omnidirectional)", {"r": 300, "alpha": 1.0, "R": 3000}),
+            "OMNI_CVOR": ("CVOR (omnidirectional)", {"r": 600, "alpha": 1.0, "R": 3000, "j": 15000, "h": 52}),
+            "OMNI_DVOR": ("DVOR (omnidirectional)", {"r": 600, "alpha": 1.0, "R": 3000, "j": 10000, "h": 52}),
+            "OMNI_DF": ("Direction Finder (omnidirectional)", {"r": 500, "alpha": 1.0, "R": 3000, "j": 10000, "h": 52}),
+            "OMNI_MARKERS": ("Markers (omnidirectional)", {"r": 50, "alpha": 20.0, "R": 200}),
+            "OMNI_NDB": ("NDB (omnidirectional)", {"r": 200, "alpha": 5.0, "R": 1000}),
+            "OMNI_GBAS_REF": ("GBAS ground Reference receiver", {"r": 400, "alpha": 3.0, "R": 3000}),
+            "OMNI_GBAS_VDB": ("GBAS VDB station", {"r": 300, "alpha": 0.9, "R": 3000}),
+            "OMNI_VDB_MON": ("VDB station monitoring station", {"r": 400, "alpha": 3.0, "R": 3000}),
+            "OMNI_VHF_TX": ("VHF Communication Tx", {"r": 300, "alpha": 1.0, "R": 2000}),
+            "OMNI_VHF_RX": ("VHF Communication Rx", {"r": 300, "alpha": 1.0, "R": 2000}),
+            "OMNI_PSR": ("PSR (surveillance)", {"r": 500, "alpha": 0.25, "R": 15000}),
+            "OMNI_SSR": ("SSR (surveillance)", {"r": 500, "alpha": 0.25, "R": 15000}),
+        }
+
+        # connect handlers
+        self._widget.cboMode.currentIndexChanged.connect(self._on_mode_changed)
+        self._widget.cboFacility.currentIndexChanged.connect(self._on_facility_changed)
         self._widget.spnA.valueChanged.connect(self._maybe_update_r)
-        # Set initial
-        cb.setCurrentIndex(0)
-        self._apply_facility_defaults()
+        self._widget.chkOmniTurbine.toggled.connect(self._on_turbine_toggle)
+        # initialize
+        self._on_mode_changed()
+
+    def _on_mode_changed(self):
+        mode_text = self._widget.cboMode.currentText() or "Directional"
+        is_omni = mode_text.lower().startswith("omni")
+        # toggle parameter groups
+        self._widget.grpParameters.setVisible(not is_omni)
+        self._widget.grpOmniParameters.setVisible(is_omni)
+        # populate facilities
+        cb = self._widget.cboFacility
+        cb.blockSignals(True)
+        cb.clear()
+        if is_omni:
+            for key, (label, _defs) in self._facility_defs_omni.items():
+                cb.addItem(label, key)
+        else:
+            for key, (label, _dep, _defs) in self._facility_defs_dir.items():
+                cb.addItem(label, key)
+        cb.blockSignals(False)
+        # apply defaults for the initial selection
+        self._on_facility_changed()
+
+    def _on_turbine_toggle(self, checked):
+        self._set_turbine_fields(enabled=checked, reset=False)
+
+    def _on_facility_changed(self):
+        mode_text = self._widget.cboMode.currentText() or "Directional"
+        is_omni = mode_text.lower().startswith("omni")
+        if is_omni:
+            self._apply_omni_defaults()
+        else:
+            self._apply_facility_defaults()
 
     def _maybe_update_r(self):
         key = self._widget.cboFacility.currentData()
-        defs = self._facility_defs.get(key, (None, False, {}))[2]
+        defs = self._facility_defs_dir.get(key, (None, False, {}))[2]
         r_expr = defs.get("r_expr")
         if r_expr == "a+6000":
             a = float(self._widget.spnA.value())
@@ -63,7 +110,7 @@ class IlsLlzDockWidget(QDockWidget):
 
     def _apply_facility_defaults(self):
         key = self._widget.cboFacility.currentData()
-        label, a_dep, defs = self._facility_defs.get(key, ("", False, {}))
+        label, a_dep, defs = self._facility_defs_dir.get(key, ("", False, {}))
         # A: if explicitly present in defaults, set; if depends on threshold, try to estimate from routing start
         if "a" in defs:
             self._widget.spnA.setValue(float(defs["a"]))
@@ -95,6 +142,31 @@ class IlsLlzDockWidget(QDockWidget):
             self._widget.spnr.setValue(float(defs["r"]))
         else:
             self._maybe_update_r()
+
+    def _apply_omni_defaults(self):
+        key = self._widget.cboFacility.currentData()
+        defs = self._facility_defs_omni.get(key, ("", {}))[1]
+        self._widget.spnOmni_r.setValue(float(defs.get("r", 0)))
+        self._widget.spnOmni_alpha.setValue(float(defs.get("alpha", 1)))
+        self._widget.spnOmni_R.setValue(float(defs.get("R", 0)))
+        has_turbine = ("j" in defs and "h" in defs)
+        # block signal to avoid resetting user toggles when applying defaults
+        self._widget.chkOmniTurbine.blockSignals(True)
+        self._widget.chkOmniTurbine.setChecked(has_turbine)
+        self._widget.chkOmniTurbine.blockSignals(False)
+        self._set_turbine_fields(enabled=has_turbine, preset_j=defs.get("j"), preset_h=defs.get("h"), reset=True)
+
+    def _set_turbine_fields(self, enabled, preset_j=None, preset_h=None, reset=False):
+        self._widget.spnOmni_j.setEnabled(enabled)
+        self._widget.spnOmni_h.setEnabled(enabled)
+        if not enabled:
+            # keep values but make them inert when toggle is off
+            return
+        if reset:
+            if preset_j is not None:
+                self._widget.spnOmni_j.setValue(float(preset_j))
+            if preset_h is not None:
+                self._widget.spnOmni_h.setValue(float(preset_h))
 
     def _toggle_direction(self):
         current = self._widget.btnDirection.property("direction") or "forward"
@@ -219,8 +291,10 @@ class IlsLlzDockWidget(QDockWidget):
         custom_name = (self._widget.txtOutputName.text() or "").strip()
         base_name = custom_name if custom_name else remark
         display_name = f"{base_name} - {facility_label}" if facility_label else base_name
+        mode_text = self._widget.cboMode.currentText() or "Directional"
+        is_omni = mode_text.lower().startswith("omni")
 
-        return {
+        params = {
             "active_layer": navaid_layer,
             "azimuth": azimuth,
             "a": a,
@@ -236,4 +310,18 @@ class IlsLlzDockWidget(QDockWidget):
             "site_elev": site_elev,
             "facility_key": facility_key,
             "facility_label": facility_label,
+            "display_name": display_name,
+            "mode": ("omni" if is_omni else "directional"),
         }
+
+        if is_omni:
+            params.update({
+                "omni_r": float(self._widget.spnOmni_r.value()),
+                "omni_alpha": float(self._widget.spnOmni_alpha.value()),
+                "omni_R": float(self._widget.spnOmni_R.value()),
+                "omni_turbine": bool(self._widget.chkOmniTurbine.isChecked()),
+                "omni_j": float(self._widget.spnOmni_j.value()),
+                "omni_h": float(self._widget.spnOmni_h.value()),
+            })
+
+        return params
