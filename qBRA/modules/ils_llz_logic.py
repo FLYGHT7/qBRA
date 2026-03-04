@@ -16,8 +16,52 @@ from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
 
 from ..models.bra_parameters import BRAParameters
+from ..models.feature_definition import FeatureDefinition
 
 # Keep formulas and geometry construction identical to legacy script.
+
+
+def create_feature(
+    definition: FeatureDefinition,
+    params: BRAParameters,
+    geometry: QgsGeometry,
+) -> QgsFeature:
+    """Create a BRA feature from a definition and parameters.
+    
+    This function eliminates code duplication by providing a single place
+    to create features with consistent attributes.
+    
+    Args:
+        definition: FeatureDefinition with id, area, max_elev, area_name
+        params: BRAParameters with all calculation parameters
+        geometry: QgsGeometry for the feature polygon
+        
+    Returns:
+        QgsFeature with geometry and attributes set
+    """
+    # Facility label preferred for 'type' attribute (falls back to key)
+    type_value = params.facility_label or params.facility_key or ""
+    
+    feature = QgsFeature()
+    feature.setGeometry(geometry)
+    feature.setAttributes([
+        definition.id,
+        definition.area,
+        definition.max_elev,
+        definition.area_name,
+        str(round(params.a, 2)),
+        str(params.b),
+        str(params.h),
+        str(round(params.r, 2)),
+        str(params.D),
+        str(params.H),
+        str(params.L),
+        str(params.phi),
+        type_value,
+    ])
+    
+    return feature
+
 
 def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:
     """Build BRA (Building Restriction Areas) vector layer with polygons.
@@ -125,73 +169,21 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:
     z_layer.updateFields()
     pr = z_layer.dataProvider()
 
-    # Facility label preferred for 'type' attribute (falls back to key)
-    _type_value = params.facility_label or params.facility_key or ""
+    # Build all feature geometries (preserving exact calculations from legacy script)
+    
+    # Base geometry
+    base_points = [pz(pt_bl, site_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev), pz(pt_al, site_elev), pz(pt_bl, site_elev)]
+    base_geom = QgsGeometry(QgsPolygon(QgsLineString(base_points), rings=[]))
 
-    # Base
-    base = [pz(pt_bl, site_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev), pz(pt_al, site_elev), pz(pt_bl, site_elev)]
-    seg = QgsFeature()
-    seg.setGeometry(QgsPolygon(QgsLineString(base), rings=[]))
-    seg.setAttributes([
-        1,
-        "base",
-        str(site_elev),
-        display_name,
-        str(round(a, 2)),
-        str(b),
-        str(h),
-        str(round(r, 2)),
-        str(D),
-        str(H),
-        str(L),
-        str(phi),
-        _type_value,
-    ])
-    pr.addFeatures([seg])
+    # Left level geometry
+    llevel_points = [pz(pt_Ll, side_elev), pz(pt_bl, side_elev), pz(pt_al, side_elev), pz(pt_drl, side_elev), pz(pt_Ll, side_elev)]
+    llevel_geom = QgsGeometry(QgsPolygon(QgsLineString(llevel_points), rings=[]))
 
-    # Left level
-    llevel = [pz(pt_Ll, side_elev), pz(pt_bl, side_elev), pz(pt_al, side_elev), pz(pt_drl, side_elev), pz(pt_Ll, side_elev)]
-    seg = QgsFeature()
-    seg.setGeometry(QgsPolygon(QgsLineString(llevel), rings=[]))
-    seg.setAttributes([
-        2,
-        "left level",
-        str(side_elev),
-        display_name,
-        str(round(a, 2)),
-        str(b),
-        str(h),
-        str(round(r, 2)),
-        str(D),
-        str(H),
-        str(L),
-        str(phi),
-        _type_value,
-    ])
-    pr.addFeatures([seg])
+    # Right level geometry
+    rlevel_points = [pz(pt_br, side_elev), pz(pt_Lr, side_elev), pz(pt_drr, side_elev), pz(pt_ar, side_elev), pz(pt_br, side_elev)]
+    rlevel_geom = QgsGeometry(QgsPolygon(QgsLineString(rlevel_points), rings=[]))
 
-    # Right level
-    rlevel = [pz(pt_br, side_elev), pz(pt_Lr, side_elev), pz(pt_drr, side_elev), pz(pt_ar, side_elev), pz(pt_br, side_elev)]
-    seg = QgsFeature()
-    seg.setGeometry(QgsPolygon(QgsLineString(rlevel), rings=[]))
-    seg.setAttributes([
-        3,
-        "right level",
-        str(side_elev),
-        display_name,
-        str(round(a, 2)),
-        str(b),
-        str(h),
-        str(round(r, 2)),
-        str(D),
-        str(H),
-        str(L),
-        str(phi),
-        _type_value,
-    ])
-    pr.addFeatures([seg])
-
-    # Slope as curve + arc
+    # Slope geometry (with curve + arc)
     from qgis.core import QgsCircularString
 
     arc = QgsCircularString.fromTwoPointsAndCenter(
@@ -199,7 +191,6 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:
         pz(pt_rr, site_elev + h),
         pz(p_geom, site_elev + h),
     )
-
     line_start = QgsLineString(
         [pz(pt_rr, site_elev + h), pz(pt_ar, site_elev), pz(pt_al, site_elev), pz(pt_rl, site_elev + h)]
     )
@@ -207,86 +198,32 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:
     curve.addCurve(arc)
     polygon = QgsPolygon()
     polygon.setExteriorRing(curve)
-    geom = QgsGeometry(polygon)
-    seg = QgsFeature()
-    seg.setGeometry(geom)
-    seg.setAttributes([
-        4,
-        "slope",
-        str(site_elev + h),
-        display_name,
-        str(round(a, 2)),
-        str(b),
-        str(h),
-        str(round(r, 2)),
-        str(D),
-        str(H),
-        str(L),
-        str(phi),
-        _type_value,
-    ])
-    pr.addFeatures([seg])
+    slope_geom = QgsGeometry(polygon)
 
-    # Walls
-    wall1 = [pz(pt_bl, site_elev), pz(pt_bl, side_elev), pz(pt_br, side_elev), pz(pt_br, site_elev)]
-    seg = QgsFeature()
-    seg.setGeometry(QgsPolygon(QgsLineString(wall1), rings=[]))
-    seg.setAttributes([
-        5,
-        "wall",
-        str(side_elev),
-        display_name,
-        str(round(a, 2)),
-        str(b),
-        str(h),
-        str(round(r, 2)),
-        str(D),
-        str(H),
-        str(L),
-        str(phi),
-        _type_value,
-    ])
-    pr.addFeatures([seg])
+    # Wall geometries
+    wall1_points = [pz(pt_bl, site_elev), pz(pt_bl, side_elev), pz(pt_br, side_elev), pz(pt_br, site_elev)]
+    wall1_geom = QgsGeometry(QgsPolygon(QgsLineString(wall1_points), rings=[]))
 
-    wall2 = [pz(pt_al, site_elev), pz(pt_al, side_elev), pz(pt_bl, side_elev), pz(pt_bl, site_elev), pz(pt_al, site_elev)]
-    seg = QgsFeature()
-    seg.setGeometry(QgsPolygon(QgsLineString(wall2), rings=[]))
-    seg.setAttributes([
-        6,
-        "wall",
-        str(side_elev),
-        display_name,
-        str(round(a, 2)),
-        str(b),
-        str(h),
-        str(round(r, 2)),
-        str(D),
-        str(H),
-        str(L),
-        str(phi),
-        _type_value,
-    ])
-    pr.addFeatures([seg])
+    wall2_points = [pz(pt_al, site_elev), pz(pt_al, side_elev), pz(pt_bl, side_elev), pz(pt_bl, site_elev), pz(pt_al, site_elev)]
+    wall2_geom = QgsGeometry(QgsPolygon(QgsLineString(wall2_points), rings=[]))
 
-    wall3 = [pz(pt_ar, site_elev), pz(pt_ar, side_elev), pz(pt_br, side_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev)]
-    seg = QgsFeature()
-    seg.setGeometry(QgsPolygon(QgsLineString(wall3), rings=[]))
-    seg.setAttributes([
-        7,
-        "wall",
-        str(side_elev),
-        remark,
-        str(round(a, 2)),
-        str(b),
-        str(h),
-        str(round(r, 2)),
-        str(D),
-        str(H),
-        str(L),
-        str(phi),
-        _type_value,
-    ])
-    pr.addFeatures([seg])
+    wall3_points = [pz(pt_ar, site_elev), pz(pt_ar, side_elev), pz(pt_br, side_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev)]
+    wall3_geom = QgsGeometry(QgsPolygon(QgsLineString(wall3_points), rings=[]))
+
+    # Define all features declaratively (eliminates code duplication)
+    feature_definitions = [
+        (FeatureDefinition(1, "base", str(site_elev), display_name, base_points), base_geom),
+        (FeatureDefinition(2, "left level", str(side_elev), display_name, llevel_points), llevel_geom),
+        (FeatureDefinition(3, "right level", str(side_elev), display_name, rlevel_points), rlevel_geom),
+        (FeatureDefinition(4, "slope", str(site_elev + h), display_name, []), slope_geom),
+        (FeatureDefinition(5, "wall", str(side_elev), display_name, wall1_points), wall1_geom),
+        (FeatureDefinition(6, "wall", str(side_elev), display_name, wall2_points), wall2_geom),
+        (FeatureDefinition(7, "wall", str(side_elev), remark, wall3_points), wall3_geom),
+    ]
+
+    # Create all features using generic function (DRY principle)
+    features = [create_feature(definition, params, geometry) for definition, geometry in feature_definitions]
+    pr.addFeatures(features)
 
     # Styling
     z_layer.renderer().symbol().setOpacity(0.5)
