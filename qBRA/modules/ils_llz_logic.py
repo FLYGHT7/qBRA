@@ -1,3 +1,5 @@
+from typing import Any, Dict, Union
+
 from qgis.core import (
     QgsVectorLayer,
     QgsField,
@@ -15,7 +17,20 @@ from qgis.PyQt.QtGui import QColor
 
 # Keep formulas and geometry construction identical to legacy script.
 
-def build_layers(iface, params):
+def build_layers(iface: Any, params: Dict[str, Any]) -> QgsVectorLayer:
+    """Build BRA (Building Restriction Areas) vector layer with polygons.
+    
+    Args:
+        iface: QGIS interface object
+        params: Dictionary containing all calculation parameters (active_layer, azimuth,
+                a, b, h, r, D, H, L, phi, remark, site_elev, etc.)
+    
+    Returns:
+        QgsVectorLayer with BRA polygon features
+        
+    Raises:
+        ValueError: If no feature is selected on the active layer
+    """
     # params expected keys: active_layer, azimuth, a, b, h, r, D, H, L, phi, remark, site_elev
     layer = params["active_layer"]
     selection = layer.selectedFeatures()
@@ -27,7 +42,16 @@ def build_layers(iface, params):
     map_srid = iface.mapCanvas().mapSettings().destinationCrs().authid()
 
     # Helper to add Z
-    def pz(point, z):
+    def pz(point: Union[QgsPoint, QgsPointXY], z: float) -> QgsPoint:
+        """Add Z coordinate to a point.
+        
+        Args:
+            point: 2D or 3D point
+            z: Z elevation value
+            
+        Returns:
+            QgsPoint with Z coordinate set
+        """
         cPoint = QgsPoint(point)
         cPoint.addZValue()
         cPoint.setZ(z)

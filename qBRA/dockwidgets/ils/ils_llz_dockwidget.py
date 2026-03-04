@@ -1,3 +1,5 @@
+from typing import Any, Optional, Dict, Tuple
+
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
@@ -11,8 +13,15 @@ UI_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)
 class IlsLlzDockWidget(QDockWidget):
     calculateRequested = pyqtSignal()
     closedRequested = pyqtSignal()
+    
+    _facility_defs: Dict[str, Tuple[str, bool, Dict[str, Any]]]
 
-    def __init__(self, iface_):
+    def __init__(self, iface_: Any) -> None:
+        """Initialize the ILS/LLZ dock widget.
+        
+        Args:
+            iface_: QGIS interface object
+        """
         super().__init__("QBRA ILS/LLZ")
         self.iface = iface_
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -23,10 +32,16 @@ class IlsLlzDockWidget(QDockWidget):
         self._init_facility()
         self.refresh_layers()
 
-    def defaultArea(self):
+    def defaultArea(self) -> Qt.DockWidgetArea:
+        """Return the default dock widget area.
+        
+        Returns:
+            The right dock widget area
+        """
         return Qt.RightDockWidgetArea
 
-    def _wire(self):
+    def _wire(self) -> None:
+        """Wire up UI signal connections."""
         self._widget.btnClose.clicked.connect(lambda: self.closedRequested.emit())
         self._widget.btnCalculate.clicked.connect(lambda: self.calculateRequested.emit())
         self._widget.btnDirection.clicked.connect(self._toggle_direction)
@@ -34,7 +49,8 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget.btnDirection.setProperty("direction", "forward")
         self._widget.btnDirection.setText("Direction: Start to End")
 
-    def _init_facility(self):
+    def _init_facility(self) -> None:
+        """Initialize facility type dropdown with predefined configurations."""
         self._facility_defs = {
             # key: (label, a_depends_threshold, defaults)
             "LOC": ("ILS LLZ – single frequency", True, {"b": 500, "h": 70, "D": 500, "H": 10, "L": 2300, "phi": 30, "r_expr": "a+6000"}),
@@ -53,16 +69,21 @@ class IlsLlzDockWidget(QDockWidget):
         cb.setCurrentIndex(0)
         self._apply_facility_defaults()
 
-    def _maybe_update_r(self):
+    def _maybe_update_r(self) -> None:
+        """Update r parameter based on facility type if it depends on a."""
         key = self._widget.cboFacility.currentData()
-        defs = self._facility_defs.get(key, (None, False, {}))[2]
+        defs: Dict[str, Any] = self._facility_defs.get(key, (None, False, {}))[2]
         r_expr = defs.get("r_expr")
         if r_expr == "a+6000":
             a = float(self._widget.spnA.value())
             self._widget.spnr.setValue(a + 6000.0)
 
-    def _apply_facility_defaults(self):
+    def _apply_facility_defaults(self) -> None:
+        """Apply default parameter values based on the selected facility type."""
         key = self._widget.cboFacility.currentData()
+        label: str
+        a_dep: bool
+        defs: Dict[str, Any]
         label, a_dep, defs = self._facility_defs.get(key, ("", False, {}))
         # A: if explicitly present in defaults, set; if depends on threshold, try to estimate from routing start
         if "a" in defs:
@@ -96,14 +117,15 @@ class IlsLlzDockWidget(QDockWidget):
         else:
             self._maybe_update_r()
 
-    def _toggle_direction(self):
+    def _toggle_direction(self) -> None:
+        """Toggle routing direction between forward and backward."""
         current = self._widget.btnDirection.property("direction") or "forward"
         new = "backward" if current == "forward" else "forward"
         self._widget.btnDirection.setProperty("direction", new)
         label = "Direction: End to Start" if new == "backward" else "Direction: Start to End"
         self._widget.btnDirection.setText(label)
 
-    def refresh_layers(self):
+    def refresh_layers(self) -> None:
         """Fill navaid (point) and routing (line) combos from layers in the canvas.
 
         Logic follows the original script: routing layer is any layer whose
@@ -114,7 +136,8 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget.cboRoutingLayer.clear()
         # Collect layers via the layer tree to include layers inside groups
         root = QgsProject.instance().layerTreeRoot()
-        def visit(node):
+        def visit(node: Any) -> None:
+            """Recursively visit layer tree nodes to collect layers."""
             for child in node.children():
                 if child.nodeType() == child.NodeLayer:
                     layer = child.layer()
@@ -140,7 +163,12 @@ class IlsLlzDockWidget(QDockWidget):
                     self._widget.cboNavaidLayer.setCurrentIndex(idx)
 
 
-    def get_parameters(self):
+    def get_parameters(self) -> Optional[Dict[str, Any]]:
+        """Extract and validate all parameters from the UI.
+        
+        Returns:
+            Dictionary with all calculation parameters, or None if validation fails
+        """
         navaid_layer = self._widget.cboNavaidLayer.currentData()
         routing_layer = self._widget.cboRoutingLayer.currentData()
         # Basic presence validation with debug logs

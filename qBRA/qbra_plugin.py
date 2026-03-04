@@ -1,23 +1,35 @@
+"""QGIS Plugin main class for qBRA."""
+
+from typing import Any, Optional, Dict
+import os
+
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import Qgis, QgsProject
-from qgis.utils import iface
+from qgis.core import Qgis, QgsProject, QgsVectorLayer
 
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
 from .modules.ils_llz_logic import build_layers
-import os
+
 
 class QbraPlugin(QObject):
-    def __init__(self, iface_):
+    """Main plugin class for qBRA - Building Restriction Areas."""
+    
+    def __init__(self, iface: Any) -> None:
+        """Initialize the plugin.
+        
+        Args:
+            iface: QGIS interface object.
+        """
         super().__init__()
-        self.iface = iface_
-        self._action = None
-        self._dock = None
-        self.plugin_dir = os.path.dirname(__file__)
-        self._icon = QIcon(os.path.join(self.plugin_dir, "icons", "qbra.svg"))
+        self.iface: Any = iface
+        self._action: Optional[QAction] = None
+        self._dock: Optional[IlsLlzDockWidget] = None
+        self.plugin_dir: str = os.path.dirname(__file__)
+        self._icon: QIcon = QIcon(os.path.join(self.plugin_dir, "icons", "qbra.svg"))
 
-    def initGui(self):
+    def initGui(self) -> None:
+        """Initialize the graphical user interface."""
         self._action = QAction("QBRA ILS/LLZ", self.iface.mainWindow())
         self._action.setObjectName("qbra_ils_llz_action")
         # Apply plugin icon to toolbar/menu action
@@ -29,7 +41,8 @@ class QbraPlugin(QObject):
         self.iface.addToolBarIcon(self._action)
         self.iface.addPluginToMenu("QBRA", self._action)
 
-    def unload(self):
+    def unload(self) -> None:
+        """Clean up and remove plugin resources."""
         if self._action:
             self.iface.removePluginMenu("QBRA", self._action)
             self.iface.removeToolBarIcon(self._action)
@@ -38,7 +51,8 @@ class QbraPlugin(QObject):
             self.iface.removeDockWidget(self._dock)
             self._dock = None
 
-    def _toggle_dock(self):
+    def _toggle_dock(self) -> None:
+        """Toggle the dock widget visibility."""
         if self._dock and not self._dock.isHidden():
             self._dock.hide()
             return
@@ -60,13 +74,14 @@ class QbraPlugin(QObject):
         self._dock.show()
         self._dock.raise_()
 
-    def _on_calculate(self):
-        params = self._dock.get_parameters()
+    def _on_calculate(self) -> None:
+        """Handle calculate button click from dock widget."""
+        params: Optional[Dict[str, Any]] = self._dock.get_parameters() if self._dock else None
         if not params:
             self.iface.messageBar().pushMessage("QBRA", "Invalid inputs", level=Qgis.Warning)
             return
         try:
-            result_layer = build_layers(self.iface, params)
+            result_layer: Optional[QgsVectorLayer] = build_layers(self.iface, params)
         except Exception as exc:
             self.iface.messageBar().pushMessage("QBRA", f"Error: {exc}", level=Qgis.Critical)
             return
