@@ -7,9 +7,15 @@ All methods are pure functions for easy testing.
 from typing import Optional, Any
 from qgis.core import QgsVectorLayer, QgsWkbTypes
 
+from ..exceptions import BRAValidationError
 
-class ValidationError(Exception):
-    """Raised when validation fails."""
+
+class ValidationError(BRAValidationError):
+    """Raised when validation fails.
+    
+    This is an alias for BRAValidationError maintained for backward compatibility
+    and to provide a more specific type for validation-related errors.
+    """
     
     def __init__(self, message: str, field: Optional[str] = None) -> None:
         """Initialize validation error.
@@ -18,9 +24,8 @@ class ValidationError(Exception):
             message: Human-readable error message
             field: Optional field name that failed validation
         """
-        super().__init__(message)
+        super().__init__(message, details=f"Field: {field}" if field else None)
         self.field = field
-        self.message = message
 
 
 class ValidationService:

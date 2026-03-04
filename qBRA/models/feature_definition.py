@@ -5,9 +5,12 @@ following DRY principles to eliminate code duplication in feature creation.
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, TYPE_CHECKING, Any
 
-from qgis.core import QgsPoint
+if TYPE_CHECKING:
+    from qgis.core import QgsPoint
+else:
+    QgsPoint = Any
 
 
 @dataclass(frozen=True)

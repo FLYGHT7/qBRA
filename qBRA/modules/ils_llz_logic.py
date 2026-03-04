@@ -17,6 +17,7 @@ from qgis.PyQt.QtGui import QColor
 
 from ..models.bra_parameters import BRAParameters
 from ..models.feature_definition import FeatureDefinition
+from ..exceptions import BRACalculationError
 
 # Keep formulas and geometry construction identical to legacy script.
 
@@ -74,13 +75,16 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:
         QgsVectorLayer with BRA polygon features
         
     Raises:
-        ValueError: If no feature is selected on the active layer
+        BRACalculationError: If feature selection or geometry calculation fails
     """
     # Extract parameters from dataclass
     layer = params.active_layer
     selection = layer.selectedFeatures()
     if not selection:
-        raise ValueError("Select one feature on the active layer")
+        raise BRACalculationError(
+            "No feature selected on active layer",
+            "Layer must have at least one selected feature for BRA calculation"
+        )
     feat = selection[0]
     p_geom = feat.geometry().asPoint()
 

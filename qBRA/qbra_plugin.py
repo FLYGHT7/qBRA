@@ -2,6 +2,7 @@
 
 from typing import Any, Optional
 import os
+import logging
 
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
@@ -11,6 +12,11 @@ from qgis.core import Qgis, QgsProject, QgsVectorLayer
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
 from .modules.ils_llz_logic import build_layers
 from .models.bra_parameters import BRAParameters
+from .exceptions import BRACalculationError, LayerNotFoundError, UIOperationError
+from .utils.logging_config import get_logger
+
+# Module logger
+logger = get_logger(__name__)
 
 
 class QbraPlugin(QObject):
@@ -36,8 +42,9 @@ class QbraPlugin(QObject):
         # Apply plugin icon to toolbar/menu action
         try:
             self._action.setIcon(self._icon)
-        except Exception:
-            pass
+        except (RuntimeError, AttributeError) as e:
+            # Icon loading can fail if file doesn't exist or Qt binding issue
+            logger.debug("Failed to set action icon: %s", e)
         self._action.triggered.connect(self._toggle_dock)
         self.iface.addToolBarIcon(self._action)
         self.iface.addPluginToMenu("QBRA", self._action)
@@ -62,16 +69,21 @@ class QbraPlugin(QObject):
             # Apply icon to dock window as well
             try:
                 self._dock.setWindowIcon(self._icon)
-            except Exception:
-                pass
+            except (RuntimeError, AttributeError) as e:
+                # Icon setting can fail, but it's cosmetic
+                logger.debug("Failed to set dock window icon: %s", e)
             self._dock.calculateRequested.connect(self._on_calculate)
             self._dock.closedRequested.connect(lambda: self._dock.hide())
             self.iface.addDockWidget(self._dock.defaultArea(), self._dock)
         # refresh layers each time we open to reflect current project state
         try:
             self._dock.refresh_layers()
-        except Exception:
-            pass
+        except LayerNotFoundError as e:
+            # No layers available is not critical - user will see empty combos
+            logger.warning("No layers found when refreshing: %s", e)
+        except Exception as e:
+            # Unexpected errors during refresh should be logged but not fatal
+            logger.error("Unexpected error during layer refresh: %s", e, exc_info=True)
         self._dock.show()
         self._dock.raise_()
 
@@ -79,13 +91,37 @@ class QbraPlugin(QObject):
         """Handle calculate button click from dock widget."""
         params: Optional[BRAParameters] = self._dock.get_parameters() if self._dock else None
         if not params:
-            self.iface.messageBar().pushMessage("QBRA", "Invalid inputs", level=Qgis.Warning)
+            self.iface.messageBar().pushMessage(
+                "QBRA",
+                "Invalid inputs - check layer selection and parameters",
+                level=Qgis.Warning
+            )
             return
+        
         try:
             result_layer: Optional[QgsVectorLayer] = build_layers(self.iface, params)
-        except Exception as exc:
-            self.iface.messageBar().pushMessage("QBRA", f"Error: {exc}", level=Qgis.Critical)
+        except BRACalculationError as e:
+            # Specific calculation errors with user-friendly messages
+            logger.error("BRA calculation failed: %s", e.message, exc_info=True)
+            error_msg = f"Calculation error: {e.message}"
+            if e.details:
+                logger.debug("Calculation error details: %s", e.details)
+            self.iface.messageBar().pushMessage("QBRA", error_msg, level=Qgis.Critical)
             return
+        except Exception as e:
+            # Unexpected errors - log with full traceback
+            logger.error("Unexpected error during BRA calculation: %s", e, exc_info=True)
+            self.iface.messageBar().pushMessage(
+                "QBRA",
+                f"Unexpected error: {type(e).__name__} - {e}",
+                level=Qgis.Critical
+            )
+            return
+        
         if result_layer:
             QgsProject.instance().addMapLayer(result_layer)
-            self.iface.messageBar().pushMessage("QBRA", "BRA areas created", level=Qgis.Success)
+            self.iface.messageBar().pushMessage(
+                "QBRA",
+                "BRA areas created successfully",
+                level=Qgis.Success
+            )

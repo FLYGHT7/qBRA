@@ -9,6 +9,7 @@ from qBRA.utils.logging_config import (
     setup_logger,
     get_logger,
     PLUGIN_NAME,
+    QGIS_AVAILABLE,
 )
 
 
@@ -25,8 +26,9 @@ class TestQGISLogHandler:
         handler = QGISLogHandler("CustomPlugin")
         assert handler.plugin_name == "CustomPlugin"
 
+    @pytest.mark.skipif(not QGIS_AVAILABLE, reason="QGIS not available")
     @patch("qBRA.utils.logging_config.QGIS_AVAILABLE", True)
-    @patch("qBRA.utils.logging_config.QgsMessageLog")
+    @patch("qgis.core.QgsMessageLog")
     def test_emit_logs_to_qgis(self, mock_qgs_log):
         """Test that emit sends logs to QGIS MessageLog."""
         handler = QGISLogHandler()
@@ -150,52 +152,87 @@ class TestGetLogger:
 class TestLoggingIntegration:
     """Test logging integration scenarios."""
 
-    def test_logger_logs_debug_message(self, caplog):
+    def test_logger_logs_debug_message(self):
         """Test that logger can log debug messages."""
+        import io
+        stream = io.StringIO()
+        
         logger = setup_logger("qBRA.test.debug_msg", level=logging.DEBUG, use_qgis=False)
+        # Add additional handler for testing
+        test_handler = logging.StreamHandler(stream)
+        test_handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(test_handler)
         
-        with caplog.at_level(logging.DEBUG):
-            logger.debug("Debug message: %s", "test")
+        logger.debug("Debug message: %s", "test")
         
-        assert "Debug message: test" in caplog.text
+        output = stream.getvalue()
+        assert "Debug message: test" in output
 
-    def test_logger_logs_info_message(self, caplog):
+    def test_logger_logs_info_message(self):
         """Test that logger can log info messages."""
+        import io
+        stream = io.StringIO()
+        
         logger = setup_logger("qBRA.test.info_msg", level=logging.INFO, use_qgis=False)
+        # Add additional handler for testing
+        test_handler = logging.StreamHandler(stream)
+        test_handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(test_handler)
         
-        with caplog.at_level(logging.INFO):
-            logger.info("Info message: %s", "test")
+        logger.info("Info message: %s", "test")
         
-        assert "Info message: test" in caplog.text
+        output = stream.getvalue()
+        assert "Info message: test" in output
 
-    def test_logger_logs_warning_message(self, caplog):
+    def test_logger_logs_warning_message(self):
         """Test that logger can log warning messages."""
+        import io
+        stream = io.StringIO()
+        
         logger = setup_logger("qBRA.test.warning_msg", level=logging.WARNING, use_qgis=False)
+        # Add additional handler for testing
+        test_handler = logging.StreamHandler(stream)
+        test_handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(test_handler)
         
-        with caplog.at_level(logging.WARNING):
-            logger.warning("Warning message: %s", "test")
+        logger.warning("Warning message: %s", "test")
         
-        assert "Warning message: test" in caplog.text
+        output = stream.getvalue()
+        assert "Warning message: test" in output
 
-    def test_logger_logs_error_message(self, caplog):
+    def test_logger_logs_error_message(self):
         """Test that logger can log error messages."""
+        import io
+        stream = io.StringIO()
+        
         logger = setup_logger("qBRA.test.error_msg", level=logging.ERROR, use_qgis=False)
+        # Add additional handler for testing
+        test_handler = logging.StreamHandler(stream)
+        test_handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(test_handler)
         
-        with caplog.at_level(logging.ERROR):
-            logger.error("Error message: %s", "test")
+        logger.error("Error message: %s", "test")
         
-        assert "Error message: test" in caplog.text
+        output = stream.getvalue()
+        assert "Error message: test" in output
 
-    def test_logger_logs_exception_with_traceback(self, caplog):
+    def test_logger_logs_exception_with_traceback(self):
         """Test that logger can log exceptions with traceback."""
+        import io
+        stream = io.StringIO()
+        
         logger = setup_logger("qBRA.test.exception", level=logging.ERROR, use_qgis=False)
+        # Add additional handler for testing
+        test_handler = logging.StreamHandler(stream)
+        test_handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(test_handler)
         
         try:
             raise ValueError("Test exception")
         except ValueError:
-            with caplog.at_level(logging.ERROR):
-                logger.error("Exception occurred", exc_info=True)
+            logger.error("Exception occurred", exc_info=True)
         
-        assert "Exception occurred" in caplog.text
-        assert "ValueError: Test exception" in caplog.text
-        assert "Traceback" in caplog.text
+        output = stream.getvalue()
+        assert "Exception occurred" in output
+        assert "ValueError: Test exception" in output
+        assert "Traceback" in output

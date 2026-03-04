@@ -11,6 +11,7 @@ import os
 from ...models.bra_parameters import BRAParameters, FacilityConfig, FacilityDefaults
 from ...services.validation_service import ValidationService, ValidationError
 from ...services.layer_service import LayerService
+from ...exceptions import BRACalculationError
 from ...utils.logging_config import get_logger
 
 # Module logger
@@ -131,17 +132,44 @@ class IlsLlzDockWidget(QDockWidget):
             try:
                 nlayer = self._widget.cboNavaidLayer.currentData()
                 rlayer = self._widget.cboRoutingLayer.currentData()
+                
+                if not nlayer or not rlayer:
+                    # No layers selected yet - set to 0 and let user adjust
+                    self._widget.spnA.setValue(0.0)
+                    return
+                
+                # Validate we have selected features
+                if nlayer.selectedFeatureCount() == 0 or rlayer.selectedFeatureCount() == 0:
+                    self._widget.spnA.setValue(0.0)
+                    return
+                
                 nfeat = nlayer.selectedFeatures()[0]
                 rfeat = rlayer.selectedFeatures()[0]
                 geom = rfeat.geometry()
+                
+                # Extract points from geometry
                 pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
                 if not pts or len(pts) < 2:
-                    raise Exception()
-                direction = self._widget.btnDirection.property("direction") or "forward"
-                pick = pts[0] if direction == "forward" else pts[-1]
+                    raise BRACalculationError(
+                        \"Routing geometry has insufficient vertices\",
+                        f\"Need at least 2 points, got {len(pts) if pts else 0}\"
+                    )
+                
+                direction = self._widget.btnDirection.property(\"direction\") or \"forward\"
+                pick = pts[0] if direction == \"forward\" else pts[-1]
                 a_val = QgsPoint(pick).distance(QgsPoint(nfeat.geometry().asPoint()))
                 self._widget.spnA.setValue(a_val)
-            except Exception:
+                
+            except BRACalculationError as e:
+                # Specific geometry errors - log and set to 0\n                logger.warning(\"Could not estimate parameter 'a': %s\", e.message)
+                self._widget.spnA.setValue(0.0)
+            except (AttributeError, IndexError, TypeError) as e:
+                # Expected errors when layers/features not properly set up yet
+                logger.debug(\"Cannot estimate 'a' from geometry: %s\", e)
+                self._widget.spnA.setValue(0.0)
+            except Exception as e:
+                # Unexpected errors - log with full context
+                logger.error(\"Unexpected error estimating 'a': %s\", e, exc_info=True)
                 self._widget.spnA.setValue(0.0)
         # Other parameters
         self._widget.spnB.setValue(float(defs.b))

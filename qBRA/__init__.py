@@ -1,10 +1,9 @@
 """qBRA QGIS Plugin - Building Restriction Areas for ILS/LLZ."""
 
 from typing import Any
-from .qbra_plugin import QbraPlugin
 
 
-def classFactory(iface: Any) -> QbraPlugin:
+def classFactory(iface: Any) -> "QbraPlugin":
     """QGIS plugin factory function.
     
     Args:
@@ -13,4 +12,6 @@ def classFactory(iface: Any) -> QbraPlugin:
     Returns:
         Instance of QbraPlugin.
     """
+    # Import here to avoid loading QGIS dependencies during test discovery
+    from .qbra_plugin import QbraPlugin
     return QbraPlugin(iface)
