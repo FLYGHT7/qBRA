@@ -234,9 +234,13 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
         pz(pt_arc_right, site_elev + h),
         pz(p_geom, site_elev + h),
     )
-    line_start = QgsLineString(
-        [pz(pt_arc_right, site_elev + h), pz(pt_ahead_right, site_elev), pz(pt_ahead_left, site_elev), pz(pt_arc_left, site_elev + h)]
-    )
+    slope_points = [
+        pz(pt_arc_right, site_elev + h),
+        pz(pt_ahead_right, site_elev),
+        pz(pt_ahead_left, site_elev),
+        pz(pt_arc_left, site_elev + h),
+    ]
+    line_start = QgsLineString(slope_points)
     curve = line_start.toCurveType()
     curve.addCurve(arc)
     polygon = QgsPolygon()
@@ -258,7 +262,7 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
         (FeatureDefinition(1, "base", str(site_elev), display_name, base_points), base_geom),
         (FeatureDefinition(2, "left level", str(side_elev), display_name, llevel_points), llevel_geom),
         (FeatureDefinition(3, "right level", str(side_elev), display_name, rlevel_points), rlevel_geom),
-        (FeatureDefinition(4, "slope", str(site_elev + h), display_name, []), slope_geom),
+        (FeatureDefinition(4, "slope", str(site_elev + h), display_name, slope_points), slope_geom),
         (FeatureDefinition(5, "wall", str(side_elev), display_name, wall1_points), wall1_geom),
         (FeatureDefinition(6, "wall", str(side_elev), display_name, wall2_points), wall2_geom),
         (FeatureDefinition(7, "wall", str(side_elev), remark, wall3_points), wall3_geom),

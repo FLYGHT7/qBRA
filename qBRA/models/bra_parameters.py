@@ -40,23 +40,23 @@ class FacilityDefaults:
         if self.r is not None and self.r_expr is not None:
             raise ValueError("Cannot specify both 'r' and 'r_expr'")
         
-        # Validate positive values
-        if self.b <= 0:
-            raise ValueError(f"b must be positive, got {self.b}")
-        if self.h <= 0:
-            raise ValueError(f"h must be positive, got {self.h}")
-        if self.D <= 0:
-            raise ValueError(f"D must be positive, got {self.D}")
-        if self.H <= 0:
-            raise ValueError(f"H must be positive, got {self.H}")
-        if self.L <= 0:
-            raise ValueError(f"L must be positive, got {self.L}")
-        if not (0 < self.phi <= 180):
+        # Validate non-negative values
+        if self.b < 0:
+            raise ValueError(f"b must be non-negative, got {self.b}")
+        if self.h < 0:
+            raise ValueError(f"h must be non-negative, got {self.h}")
+        if self.D < 0:
+            raise ValueError(f"D must be non-negative, got {self.D}")
+        if self.H < 0:
+            raise ValueError(f"H must be non-negative, got {self.H}")
+        if self.L < 0:
+            raise ValueError(f"L must be non-negative, got {self.L}")
+        if not (0 <= self.phi <= 180):
             raise ValueError(f"phi must be between 0 and 180 degrees, got {self.phi}")
         if self.a is not None and self.a < 0:
             raise ValueError(f"a must be non-negative, got {self.a}")
-        if self.r is not None and self.r <= 0:
-            raise ValueError(f"r must be positive, got {self.r}")
+        if self.r is not None and self.r < 0:
+            raise ValueError(f"r must be non-negative, got {self.r}")
 
 
 @dataclass(frozen=True)
@@ -144,22 +144,22 @@ class BRAParameters:
         if not (0 <= self.azimuth < 360):
             raise ValueError(f"azimuth must be in [0, 360), got {self.azimuth}")
         
-        # Validate positive values
+        # Validate non-negative values
         if self.a < 0:
             raise ValueError(f"a must be non-negative, got {self.a}")
-        if self.b <= 0:
-            raise ValueError(f"b must be positive, got {self.b}")
-        if self.h <= 0:
-            raise ValueError(f"h must be positive, got {self.h}")
-        if self.r <= 0:
-            raise ValueError(f"r must be positive, got {self.r}")
-        if self.D <= 0:
-            raise ValueError(f"D must be positive, got {self.D}")
-        if self.H <= 0:
-            raise ValueError(f"H must be positive, got {self.H}")
-        if self.L <= 0:
-            raise ValueError(f"L must be positive, got {self.L}")
-        if not (0 < self.phi <= 180):
+        if self.b < 0:
+            raise ValueError(f"b must be non-negative, got {self.b}")
+        if self.h < 0:
+            raise ValueError(f"h must be non-negative, got {self.h}")
+        if self.r < 0:
+            raise ValueError(f"r must be non-negative, got {self.r}")
+        if self.D < 0:
+            raise ValueError(f"D must be non-negative, got {self.D}")
+        if self.H < 0:
+            raise ValueError(f"H must be non-negative, got {self.H}")
+        if self.L < 0:
+            raise ValueError(f"L must be non-negative, got {self.L}")
+        if not (0 <= self.phi <= 180):
             raise ValueError(f"phi must be between 0 and 180 degrees, got {self.phi}")
         
         # Validate direction

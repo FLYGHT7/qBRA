@@ -70,33 +70,33 @@ class TestFacilityDefaults:
         with pytest.raises(ValueError, match="Cannot specify both"):
             _valid_defaults(r=6000, r_expr="a+6000")
 
-    def test_zero_b_raises(self):
-        with pytest.raises(ValueError, match="b must be positive"):
-            _valid_defaults(b=0)
+    def test_zero_b_accepted(self):
+        d = _valid_defaults(b=0)
+        assert d.b == 0
 
     def test_negative_b_raises(self):
-        with pytest.raises(ValueError, match="b must be positive"):
+        with pytest.raises(ValueError, match="b must be non-negative"):
             _valid_defaults(b=-10)
 
-    def test_zero_h_raises(self):
-        with pytest.raises(ValueError, match="h must be positive"):
-            _valid_defaults(h=0)
+    def test_zero_h_accepted(self):
+        d = _valid_defaults(h=0)
+        assert d.h == 0
 
-    def test_zero_D_raises(self):
-        with pytest.raises(ValueError, match="D must be positive"):
-            _valid_defaults(D=0)
+    def test_zero_D_accepted(self):
+        d = _valid_defaults(D=0)
+        assert d.D == 0
 
-    def test_zero_H_raises(self):
-        with pytest.raises(ValueError, match="H must be positive"):
-            _valid_defaults(H=0)
+    def test_zero_H_accepted(self):
+        d = _valid_defaults(H=0)
+        assert d.H == 0
 
-    def test_zero_L_raises(self):
-        with pytest.raises(ValueError, match="L must be positive"):
-            _valid_defaults(L=0)
+    def test_zero_L_accepted(self):
+        d = _valid_defaults(L=0)
+        assert d.L == 0
 
-    def test_phi_zero_raises(self):
-        with pytest.raises(ValueError, match="phi must be between 0 and 180"):
-            _valid_defaults(phi=0)
+    def test_phi_zero_accepted(self):
+        d = _valid_defaults(phi=0)
+        assert d.phi == 0
 
     def test_phi_exceeds_180_raises(self):
         with pytest.raises(ValueError, match="phi must be between 0 and 180"):
@@ -114,8 +114,24 @@ class TestFacilityDefaults:
         d = _valid_defaults(a=0, r=6000, r_expr=None)
         assert d.a == 0
 
+    def test_negative_h_raises(self):
+        with pytest.raises(ValueError, match="h must be non-negative"):
+            _valid_defaults(h=-1)
+
+    def test_negative_D_raises(self):
+        with pytest.raises(ValueError, match="D must be non-negative"):
+            _valid_defaults(D=-1)
+
+    def test_negative_H_raises(self):
+        with pytest.raises(ValueError, match="H must be non-negative"):
+            _valid_defaults(H=-1)
+
+    def test_negative_L_raises(self):
+        with pytest.raises(ValueError, match="L must be non-negative"):
+            _valid_defaults(L=-1)
+
     def test_negative_r_raises(self):
-        with pytest.raises(ValueError, match="r must be positive"):
+        with pytest.raises(ValueError, match="r must be non-negative"):
             _valid_defaults(r=-1, r_expr=None)
 
     def test_frozen_immutability(self):
@@ -245,33 +261,57 @@ class TestBRAParameters:
         with pytest.raises(ValueError, match="a must be non-negative"):
             _valid_params(mock_qgs_vector_layer, a=-1.0)
 
-    def test_b_zero_raises(self, mock_qgs_vector_layer):
-        with pytest.raises(ValueError, match="b must be positive"):
-            _valid_params(mock_qgs_vector_layer, b=0.0)
+    def test_b_zero_accepted(self, mock_qgs_vector_layer):
+        params = _valid_params(mock_qgs_vector_layer, b=0.0)
+        assert params.b == 0.0
 
-    def test_h_zero_raises(self, mock_qgs_vector_layer):
-        with pytest.raises(ValueError, match="h must be positive"):
-            _valid_params(mock_qgs_vector_layer, h=0.0)
+    def test_h_zero_accepted(self, mock_qgs_vector_layer):
+        params = _valid_params(mock_qgs_vector_layer, h=0.0)
+        assert params.h == 0.0
 
-    def test_r_zero_raises(self, mock_qgs_vector_layer):
-        with pytest.raises(ValueError, match="r must be positive"):
-            _valid_params(mock_qgs_vector_layer, r=0.0)
+    def test_r_zero_accepted(self, mock_qgs_vector_layer):
+        params = _valid_params(mock_qgs_vector_layer, r=0.0)
+        assert params.r == 0.0
 
-    def test_D_zero_raises(self, mock_qgs_vector_layer):
-        with pytest.raises(ValueError, match="D must be positive"):
-            _valid_params(mock_qgs_vector_layer, D=0.0)
+    def test_D_zero_accepted(self, mock_qgs_vector_layer):
+        params = _valid_params(mock_qgs_vector_layer, D=0.0)
+        assert params.D == 0.0
 
-    def test_H_zero_raises(self, mock_qgs_vector_layer):
-        with pytest.raises(ValueError, match="H must be positive"):
-            _valid_params(mock_qgs_vector_layer, H=0.0)
+    def test_H_zero_accepted(self, mock_qgs_vector_layer):
+        params = _valid_params(mock_qgs_vector_layer, H=0.0)
+        assert params.H == 0.0
 
-    def test_L_zero_raises(self, mock_qgs_vector_layer):
-        with pytest.raises(ValueError, match="L must be positive"):
-            _valid_params(mock_qgs_vector_layer, L=0.0)
+    def test_L_zero_accepted(self, mock_qgs_vector_layer):
+        params = _valid_params(mock_qgs_vector_layer, L=0.0)
+        assert params.L == 0.0
 
-    def test_phi_zero_raises(self, mock_qgs_vector_layer):
-        with pytest.raises(ValueError, match="phi must be between 0 and 180"):
-            _valid_params(mock_qgs_vector_layer, phi=0.0)
+    def test_phi_zero_accepted(self, mock_qgs_vector_layer):
+        params = _valid_params(mock_qgs_vector_layer, phi=0.0)
+        assert params.phi == 0.0
+
+    def test_b_negative_raises(self, mock_qgs_vector_layer):
+        with pytest.raises(ValueError, match="b must be non-negative"):
+            _valid_params(mock_qgs_vector_layer, b=-1.0)
+
+    def test_h_negative_raises(self, mock_qgs_vector_layer):
+        with pytest.raises(ValueError, match="h must be non-negative"):
+            _valid_params(mock_qgs_vector_layer, h=-1.0)
+
+    def test_r_negative_raises(self, mock_qgs_vector_layer):
+        with pytest.raises(ValueError, match="r must be non-negative"):
+            _valid_params(mock_qgs_vector_layer, r=-1.0)
+
+    def test_D_negative_raises(self, mock_qgs_vector_layer):
+        with pytest.raises(ValueError, match="D must be non-negative"):
+            _valid_params(mock_qgs_vector_layer, D=-1.0)
+
+    def test_H_negative_raises(self, mock_qgs_vector_layer):
+        with pytest.raises(ValueError, match="H must be non-negative"):
+            _valid_params(mock_qgs_vector_layer, H=-1.0)
+
+    def test_L_negative_raises(self, mock_qgs_vector_layer):
+        with pytest.raises(ValueError, match="L must be non-negative"):
+            _valid_params(mock_qgs_vector_layer, L=-1.0)
 
     def test_phi_180_accepted(self, mock_qgs_vector_layer):
         params = _valid_params(mock_qgs_vector_layer, phi=180.0)

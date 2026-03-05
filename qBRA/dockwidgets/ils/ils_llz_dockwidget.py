@@ -4,8 +4,7 @@ from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
 from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea
-from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
-from qgis.utils import iface
+from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer
 
 import os
 
@@ -128,25 +127,26 @@ class IlsLlzDockWidget(QDockWidget):
                 pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
                 if not pts or len(pts) < 2:
                     raise BRACalculationError(
-                        \"Routing geometry has insufficient vertices\",
-                        f\"Need at least 2 points, got {len(pts) if pts else 0}\"
+                        "Routing geometry has insufficient vertices",
+                        f"Need at least 2 points, got {len(pts) if pts else 0}"
                     )
-                
-                direction = self._widget.btnDirection.property(\"direction\") or \"forward\"
-                pick = pts[0] if direction == \"forward\" else pts[-1]
+
+                direction = self._widget.btnDirection.property("direction") or "forward"
+                pick = pts[0] if direction == "forward" else pts[-1]
                 a_val = QgsPoint(pick).distance(QgsPoint(nfeat.geometry().asPoint()))
                 self._widget.spnA.setValue(a_val)
-                
+
             except BRACalculationError as e:
-                # Specific geometry errors - log and set to 0\n                logger.warning(\"Could not estimate parameter 'a': %s\", e.message)
+                # Specific geometry errors - log and set to 0
+                logger.warning("Could not estimate parameter 'a': %s", e.message)
                 self._widget.spnA.setValue(0.0)
             except (AttributeError, IndexError, TypeError) as e:
                 # Expected errors when layers/features not properly set up yet
-                logger.debug(\"Cannot estimate 'a' from geometry: %s\", e)
+                logger.debug("Cannot estimate 'a' from geometry: %s", e)
                 self._widget.spnA.setValue(0.0)
             except Exception as e:
                 # Unexpected errors - log with full context
-                logger.error(\"Unexpected error estimating 'a': %s\", e, exc_info=True)
+                logger.error("Unexpected error estimating 'a': %s", e, exc_info=True)
                 self._widget.spnA.setValue(0.0)
         # Other parameters
         self._widget.spnB.setValue(float(defs.b))
@@ -296,7 +296,17 @@ class IlsLlzDockWidget(QDockWidget):
             
         except (ValidationError, ValueError) as e:
             logger.warning("Parameter validation failed: %s", e)
+            self.iface.messageBar().pushMessage(
+                "QBRA",
+                str(e),
+                level=1,  # Qgis.Warning
+            )
             return None
         except Exception as e:
             logger.error("Unexpected error while extracting parameters: %s", e, exc_info=True)
+            self.iface.messageBar().pushMessage(
+                "QBRA",
+                f"Unexpected error: {e}",
+                level=2,  # Qgis.Critical
+            )
             return None

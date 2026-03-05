@@ -2,7 +2,6 @@
 
 from typing import Any, Optional
 import os
-import logging
 
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
@@ -11,7 +10,7 @@ from qgis.core import Qgis, QgsProject, QgsVectorLayer
 
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
 from .models.bra_parameters import BRAParameters
-from .exceptions import BRACalculationError, LayerNotFoundError, UIOperationError
+from .exceptions import LayerNotFoundError
 from .workers.bra_worker import BRAWorker
 from .utils.logging_config import get_logger
 
@@ -52,6 +51,10 @@ class QbraPlugin(QObject):
 
     def unload(self) -> None:
         """Clean up and remove plugin resources."""
+        if self._worker and self._worker.isRunning():
+            self._worker.quit()
+            self._worker.wait()
+        self._worker = None
         if self._action:
             self.iface.removePluginMenu("QBRA", self._action)
             self.iface.removeToolBarIcon(self._action)
@@ -90,21 +93,19 @@ class QbraPlugin(QObject):
 
     def _on_calculate(self) -> None:
         """Handle calculate button click — starts calculation on a background thread."""
+        if self._worker and self._worker.isRunning():
+            return  # BUG-02: ignore re-entrant calls while a calculation is in flight
+
         params: Optional[BRAParameters] = self._dock.get_parameters() if self._dock else None
         if not params:
-            self.iface.messageBar().pushMessage(
-                "QBRA",
-                "Invalid inputs - check layer selection and parameters",
-                level=Qgis.Warning
-            )
             return
 
         self._dock.set_calculating(True)
         self._worker = BRAWorker(self.iface, params, parent=self)
         self._worker.finished.connect(self._on_calculation_finished)
         self._worker.error.connect(self._on_calculation_error)
-        self._worker.finished.connect(lambda _: self._dock.set_calculating(False))
-        self._worker.error.connect(lambda _: self._dock.set_calculating(False))
+        self._worker.finished.connect(lambda _: self._dock.set_calculating(False) if self._dock else None)
+        self._worker.error.connect(lambda _: self._dock.set_calculating(False) if self._dock else None)
         self._worker.start()
 
     def _on_calculation_finished(self, result_layer: Optional[QgsVectorLayer]) -> None:
