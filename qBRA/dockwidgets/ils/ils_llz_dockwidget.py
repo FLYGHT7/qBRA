@@ -1,22 +1,48 @@
+from typing import Any, Optional, Dict, Tuple
+
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
-from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
-from qgis.utils import iface
+from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea
+from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer
 
 import os
 import re
+
+from ...models.bra_parameters import BRAParameters, FacilityConfig
+from ...services.validation_service import ValidationService, ValidationError
+from ...services.layer_service import LayerService
+from ...exceptions import BRACalculationError
+from ...utils.logging_config import get_logger
+from ...config import FACILITY_REGISTRY
+
+# Module logger
+logger = get_logger(__name__)
 
 UI_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ui", "ils", "ils_llz_panel.ui")
 
 class IlsLlzDockWidget(QDockWidget):
     calculateRequested = pyqtSignal()
     closedRequested = pyqtSignal()
+    
+    _facility_defs: Dict[str, FacilityConfig]
+    _validation_service: ValidationService
+    _layer_service: LayerService
 
-    def __init__(self, iface_):
+    def __init__(self, iface_: Any) -> None:
+        """Initialize the ILS/LLZ dock widget.
+        
+        Args:
+            iface_: QGIS interface object
+        """
         super().__init__("QBRA ILS/LLZ")
         self.iface = iface_
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        
+        # Initialize services (dependency injection)
+        self._validation_service = ValidationService()
+        self._layer_service = LayerService(iface_)
+        
+        self.setAllowedAreas(LeftDockWidgetArea | RightDockWidgetArea)
         self.setObjectName("IlsLlzDockWidget")
         self._widget = uic.loadUi(UI_PATH)
         self.setWidget(self._widget)
@@ -24,10 +50,16 @@ class IlsLlzDockWidget(QDockWidget):
         self._init_mode_and_facilities()
         self.refresh_layers()
 
-    def defaultArea(self):
-        return Qt.RightDockWidgetArea
+    def defaultArea(self) -> Qt.DockWidgetArea:
+        """Return the default dock widget area.
+        
+        Returns:
+            The right dock widget area
+        """
+        return RightDockWidgetArea
 
-    def _wire(self):
+    def _wire(self) -> None:
+        """Wire up UI signal connections."""
         self._widget.btnClose.clicked.connect(lambda: self.closedRequested.emit())
         self._widget.btnCalculate.clicked.connect(lambda: self.calculateRequested.emit())
         self._widget.btnDirection.clicked.connect(self._toggle_direction)
@@ -101,7 +133,8 @@ class IlsLlzDockWidget(QDockWidget):
         else:
             self._apply_facility_defaults()
 
-    def _maybe_update_r(self):
+    def _maybe_update_r(self) -> None:
+        """Update r parameter based on facility type if it depends on a."""
         key = self._widget.cboFacility.currentData()
         defs = self._facility_defs_dir.get(key, (None, False, {}))[2]
         r_expr = defs.get("r_expr")
@@ -109,12 +142,13 @@ class IlsLlzDockWidget(QDockWidget):
             a = float(self._widget.spnA.value())
             self._widget.spnr.setValue(a + 6000.0)
 
-    def _apply_facility_defaults(self):
+    def _apply_facility_defaults(self) -> None:
+        """Apply default parameter values based on the selected facility type."""
         key = self._widget.cboFacility.currentData()
         label, a_dep, defs = self._facility_defs_dir.get(key, ("", False, {}))
         # A: if explicitly present in defaults, set; if depends on threshold, try to estimate from routing start
-        if "a" in defs:
-            self._widget.spnA.setValue(float(defs["a"]))
+        if defs.a is not None:
+            self._widget.spnA.setValue(float(defs.a))
         else:
             # try estimate: distance from navaid to routing start/end depending on direction
             try:
@@ -126,24 +160,41 @@ class IlsLlzDockWidget(QDockWidget):
                 nfeat = nlayer.selectedFeatures()[0]
                 rfeat = rlayer.selectedFeatures()[0]
                 geom = rfeat.geometry()
+                
+                # Extract points from geometry
                 pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
                 if not pts or len(pts) < 2:
-                    raise Exception()
+                    raise BRACalculationError(
+                        "Routing geometry has insufficient vertices",
+                        f"Need at least 2 points, got {len(pts) if pts else 0}"
+                    )
+
                 direction = self._widget.btnDirection.property("direction") or "forward"
                 pick = pts[0] if direction == "forward" else pts[-1]
                 a_val = QgsPoint(pick).distance(QgsPoint(nfeat.geometry().asPoint()))
                 self._widget.spnA.setValue(a_val)
-            except Exception:
+
+            except BRACalculationError as e:
+                # Specific geometry errors - log and set to 0
+                logger.warning("Could not estimate parameter 'a': %s", e.message)
+                self._widget.spnA.setValue(0.0)
+            except (AttributeError, IndexError, TypeError) as e:
+                # Expected errors when layers/features not properly set up yet
+                logger.debug("Cannot estimate 'a' from geometry: %s", e)
+                self._widget.spnA.setValue(0.0)
+            except Exception as e:
+                # Unexpected errors - log with full context
+                logger.error("Unexpected error estimating 'a': %s", e, exc_info=True)
                 self._widget.spnA.setValue(0.0)
         # Other parameters
-        self._widget.spnB.setValue(float(defs.get("b", self._widget.spnB.value())))
-        self._widget.spnh.setValue(float(defs.get("h", self._widget.spnh.value())))
-        self._widget.spnD.setValue(float(defs.get("D", self._widget.spnD.value())))
-        self._widget.spnH.setValue(float(defs.get("H", self._widget.spnH.value())))
-        self._widget.spnL.setValue(float(defs.get("L", self._widget.spnL.value())))
-        self._widget.spnPhi.setValue(float(defs.get("phi", self._widget.spnPhi.value())))
-        if "r" in defs:
-            self._widget.spnr.setValue(float(defs["r"]))
+        self._widget.spnB.setValue(float(defs.b))
+        self._widget.spnh.setValue(float(defs.h))
+        self._widget.spnD.setValue(float(defs.D))
+        self._widget.spnH.setValue(float(defs.H))
+        self._widget.spnL.setValue(float(defs.L))
+        self._widget.spnPhi.setValue(float(defs.phi))
+        if defs.r is not None:
+            self._widget.spnr.setValue(float(defs.r))
         else:
             self._maybe_update_r()
 
@@ -179,12 +230,10 @@ class IlsLlzDockWidget(QDockWidget):
         label = "Direction: End to Start" if new == "backward" else "Direction: Start to End"
         self._widget.btnDirection.setText(label)
 
-    def refresh_layers(self):
+    def refresh_layers(self) -> None:
         """Fill navaid (point) and routing (line) combos from layers in the canvas.
 
-        Logic follows the original script: routing layer is any layer whose
-        name contains 'routing'; navaid layer defaults to the current active
-        layer (point).
+        Uses LayerService to discover layers from the project.
         """
         self._widget.cboNavaidLayer.clear()
         self._widget.cboRoutingLayer.clear()
@@ -274,20 +323,11 @@ class IlsLlzDockWidget(QDockWidget):
         else:
             remark = _format_runway(attrs[rwy_idx])
 
-        # Compute azimuth from selected routing feature (as in legacy script)
-        routing_sel = routing_layer.selectedFeatures()
-        if not routing_sel:
-            print("QBRA ILS/LLZ: no routing feature selected")
-            return None
 
-        geom = routing_sel[0].geometry()
-        if geom.isMultipart():
-            pts = geom.asMultiPolyline()[0]
-        else:
-            pts = geom.asPolyline()
-        if not pts or len(pts) < 2:
-            print("QBRA ILS/LLZ: routing geometry has insufficient vertices")
-            return None
+    def set_calculating(self, calculating: bool) -> None:
+        """Enable/disable the Calculate button during background calculation."""
+        self._widget.btnCalculate.setEnabled(not calculating)
+        self._widget.btnCalculate.setText("Calculating\u2026" if calculating else "Calculate")
 
         # Apply direction setting to routing points
         direction = self._widget.btnDirection.property("direction") or "forward"

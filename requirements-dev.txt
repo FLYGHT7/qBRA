@@ -1,0 +1,28 @@
+# Development dependencies for qBRA refactoring
+# Install with: pip install -r requirements-dev.txt
+
+# Type checking
+mypy>=1.8.0
+types-setuptools
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+pytest-timeout>=2.2.0
+
+# Code quality
+black>=23.12.0
+flake8>=7.0.0
+isort>=5.13.0
+
+# Development tools
+ipython>=8.18.0
+ipdb>=0.13.13
+
+# Documentation (for Phase 6)
+# sphinx>=7.2.0
+# sphinx-rtd-theme>=2.0.0
+
+# Note: QGIS and PyQt are provided by QGIS installation
+# These cannot be installed via pip in a standard way
