@@ -5,7 +5,7 @@ from qgis.core import Qgis, QgsProject
 from qgis.utils import iface
 
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
-from .modules.ils_llz_logic import build_layers
+from .modules.ils_llz_logic import build_layers, build_layers_omni
 import os
 
 class QbraPlugin(QObject):
@@ -66,7 +66,11 @@ class QbraPlugin(QObject):
             self.iface.messageBar().pushMessage("QBRA", "Invalid inputs", level=Qgis.Warning)
             return
         try:
-            result_layer = build_layers(self.iface, params)
+            mode = params.get("mode", "directional")
+            if mode == "omni":
+                result_layer = build_layers_omni(self.iface, params)
+            else:
+                result_layer = build_layers(self.iface, params)
         except Exception as exc:
             self.iface.messageBar().pushMessage("QBRA", f"Error: {exc}", level=Qgis.Critical)
             return
