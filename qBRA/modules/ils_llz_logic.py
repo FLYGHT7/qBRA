@@ -32,13 +32,13 @@ from qgis.core import (
     QgsLineString,
 )
 from math import tan, radians, cos, sin, pi
-from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
 
 from ..models.bra_parameters import BRAParameters
 from ..models.feature_definition import FeatureDefinition
 from ..exceptions import BRACalculationError
 from ..constants import PROJECTION_DISTANCE, CRS_TEMPLATE_PREFIX, LAYER_NAME_SUFFIX
+from ..utils.qt_compat import QVariantInt, QVariantString
 
 # Keep formulas and geometry construction identical to legacy script.
 
@@ -194,20 +194,20 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
     # Memory layer for polygons
     z_layer = QgsVectorLayer(CRS_TEMPLATE_PREFIX + map_srid, f"{display_name} {LAYER_NAME_SUFFIX}", "memory")
     fields = [
-        QgsField("id", QVariant.Int),
-        QgsField("area", QVariant.String),
-        QgsField("max_elev", QVariant.String),
-        QgsField("area_name", QVariant.String),
-        QgsField("a", QVariant.String),
-        QgsField("b", QVariant.String),
-        QgsField("h", QVariant.String),
-        QgsField("r", QVariant.String),
-        QgsField("D", QVariant.String),
-        QgsField("H", QVariant.String),
-        QgsField("L", QVariant.String),
-        QgsField("phi", QVariant.String),
+        QgsField("id", QVariantInt),
+        QgsField("area", QVariantString),
+        QgsField("max_elev", QVariantString),
+        QgsField("area_name", QVariantString),
+        QgsField("a", QVariantString),
+        QgsField("b", QVariantString),
+        QgsField("h", QVariantString),
+        QgsField("r", QVariantString),
+        QgsField("D", QVariantString),
+        QgsField("H", QVariantString),
+        QgsField("L", QVariantString),
+        QgsField("phi", QVariantString),
         # Place 'type' as the last attribute per user request
-        QgsField("type", QVariant.String),
+        QgsField("type", QVariantString),
     ]
     z_layer.dataProvider().addAttributes(fields)
     z_layer.updateFields()
@@ -384,15 +384,15 @@ def build_layers_omni(iface, params):
     # Create memory layer for 3D polygons
     layer_out = QgsVectorLayer("PolygonZ?crs=" + map_srid, f"{display_name} BRA_omni", "memory")
     fields = [
-        QgsField("id", QVariant.Int),
-        QgsField("area", QVariant.String),
-        QgsField("area_name", QVariant.String),
-        QgsField("r", QVariant.String),
-        QgsField("alpha", QVariant.String),
-        QgsField("R", QVariant.String),
-        QgsField("j", QVariant.String),
-        QgsField("h", QVariant.String),
-        QgsField("type", QVariant.String),
+        QgsField("id", QVariantInt),
+        QgsField("area", QVariantString),
+        QgsField("area_name", QVariantString),
+        QgsField("r", QVariantString),
+        QgsField("alpha", QVariantString),
+        QgsField("R", QVariantString),
+        QgsField("j", QVariantString),
+        QgsField("h", QVariantString),
+        QgsField("type", QVariantString),
     ]
     pr = layer_out.dataProvider()
     pr.addAttributes(fields)

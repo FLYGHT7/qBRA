@@ -3,18 +3,17 @@ from typing import Any, Optional, Dict, Tuple
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
-from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea
-from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer
+from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea, MsgWarning, MsgCritical
+from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
 
 import os
 import re
 
-from ...models.bra_parameters import BRAParameters, FacilityConfig
+from ...models.bra_parameters import BRAParameters
 from ...services.validation_service import ValidationService, ValidationError
 from ...services.layer_service import LayerService
 from ...exceptions import BRACalculationError
 from ...utils.logging_config import get_logger
-from ...config import FACILITY_REGISTRY
 
 # Module logger
 logger = get_logger(__name__)
@@ -25,7 +24,8 @@ class IlsLlzDockWidget(QDockWidget):
     calculateRequested = pyqtSignal()
     closedRequested = pyqtSignal()
     
-    _facility_defs: Dict[str, FacilityConfig]
+    _facility_defs_dir: Dict[str, Tuple]
+    _facility_defs_omni: Dict[str, Tuple]
     _validation_service: ValidationService
     _layer_service: LayerService
 
@@ -142,59 +142,77 @@ class IlsLlzDockWidget(QDockWidget):
             a = float(self._widget.spnA.value())
             self._widget.spnr.setValue(a + 6000.0)
 
+    def _estimate_a_from_layers(self) -> float:
+        """Estimate the 'a' parameter (navaid-to-threshold distance) from selected layers.
+
+        Returns:
+            Estimated distance in metres, or 0.0 if layers/features are not ready.
+        """
+        try:
+            nlayer_id = self._widget.cboNavaidLayer.currentData()
+            rlayer_id = self._widget.cboRoutingLayer.currentData()
+            nlayer = QgsProject.instance().mapLayer(nlayer_id) if nlayer_id else None
+            rlayer = QgsProject.instance().mapLayer(rlayer_id) if rlayer_id else None
+
+            if not nlayer or not rlayer:
+                return 0.0
+
+            if nlayer.selectedFeatureCount() == 0 or rlayer.selectedFeatureCount() == 0:
+                return 0.0
+
+            nfeat = nlayer.selectedFeatures()[0]
+            rfeat = rlayer.selectedFeatures()[0]
+            geom = rfeat.geometry()
+
+            pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
+            if not pts or len(pts) < 2:
+                raise BRACalculationError(
+                    "Routing geometry has insufficient vertices",
+                    f"Need at least 2 points, got {len(pts) if pts else 0}",
+                )
+
+            direction = self._widget.btnDirection.property("direction") or "forward"
+            pick = pts[0] if direction == "forward" else pts[-1]
+            # Both pick and npt are QgsPointXY — use QgsPointXY.distance() directly
+            npt = nfeat.geometry().asPoint()
+            return pick.distance(npt)
+
+        except BRACalculationError as e:
+            logger.warning("Could not estimate parameter 'a': %s", e.message)
+            return 0.0
+        except (AttributeError, IndexError, TypeError) as e:
+            logger.debug("Cannot estimate 'a' from geometry: %s", e)
+            return 0.0
+        except Exception as e:
+            logger.error("Unexpected error estimating 'a': %s", e, exc_info=True)
+            return 0.0
+
     def _apply_facility_defaults(self) -> None:
         """Apply default parameter values based on the selected facility type."""
         key = self._widget.cboFacility.currentData()
-        label, a_dep, defs = self._facility_defs_dir.get(key, ("", False, {}))
-        # A: if explicitly present in defaults, set; if depends on threshold, try to estimate from routing start
-        if defs.a is not None:
-            self._widget.spnA.setValue(float(defs.a))
+        entry = self._facility_defs_dir.get(key)
+        if entry is None:
+            return
+
+        _label, _a_dep, defs = entry
+        # A: if explicitly present in defaults, set it; otherwise estimate from layers.
+        # The estimation may return 0.0 on initial load (no layers yet) — that is fine.
+        a_default = defs.get("a")
+        if a_default is not None:
+            self._widget.spnA.setValue(float(a_default))
         else:
-            # try estimate: distance from navaid to routing start/end depending on direction
-            try:
-                # Resolve via project from stored IDs
-                nlayer_id = self._widget.cboNavaidLayer.currentData()
-                rlayer_id = self._widget.cboRoutingLayer.currentData()
-                nlayer = QgsProject.instance().mapLayer(nlayer_id)
-                rlayer = QgsProject.instance().mapLayer(rlayer_id)
-                nfeat = nlayer.selectedFeatures()[0]
-                rfeat = rlayer.selectedFeatures()[0]
-                geom = rfeat.geometry()
-                
-                # Extract points from geometry
-                pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
-                if not pts or len(pts) < 2:
-                    raise BRACalculationError(
-                        "Routing geometry has insufficient vertices",
-                        f"Need at least 2 points, got {len(pts) if pts else 0}"
-                    )
+            self._widget.spnA.setValue(self._estimate_a_from_layers())
 
-                direction = self._widget.btnDirection.property("direction") or "forward"
-                pick = pts[0] if direction == "forward" else pts[-1]
-                a_val = QgsPoint(pick).distance(QgsPoint(nfeat.geometry().asPoint()))
-                self._widget.spnA.setValue(a_val)
-
-            except BRACalculationError as e:
-                # Specific geometry errors - log and set to 0
-                logger.warning("Could not estimate parameter 'a': %s", e.message)
-                self._widget.spnA.setValue(0.0)
-            except (AttributeError, IndexError, TypeError) as e:
-                # Expected errors when layers/features not properly set up yet
-                logger.debug("Cannot estimate 'a' from geometry: %s", e)
-                self._widget.spnA.setValue(0.0)
-            except Exception as e:
-                # Unexpected errors - log with full context
-                logger.error("Unexpected error estimating 'a': %s", e, exc_info=True)
-                self._widget.spnA.setValue(0.0)
-        # Other parameters
-        self._widget.spnB.setValue(float(defs.b))
-        self._widget.spnh.setValue(float(defs.h))
-        self._widget.spnD.setValue(float(defs.D))
-        self._widget.spnH.setValue(float(defs.H))
-        self._widget.spnL.setValue(float(defs.L))
-        self._widget.spnPhi.setValue(float(defs.phi))
-        if defs.r is not None:
-            self._widget.spnr.setValue(float(defs.r))
+        # Always apply all other facility defaults regardless of 'a' estimation outcome.
+        self._widget.spnB.setValue(float(defs["b"]))
+        self._widget.spnh.setValue(float(defs["h"]))
+        self._widget.spnD.setValue(float(defs["D"]))
+        self._widget.spnH.setValue(float(defs["H"]))
+        self._widget.spnL.setValue(float(defs["L"]))
+        self._widget.spnPhi.setValue(float(defs["phi"]))
+        r_default = defs.get("r")
+        if r_default is not None:
+            self._widget.spnr.setValue(float(r_default))
         else:
             self._maybe_update_r()
 
@@ -256,7 +274,7 @@ class IlsLlzDockWidget(QDockWidget):
         visit(root)
 
         # Default navaid: current active layer if it is a point layer
-        al = iface.activeLayer()
+        al = self.iface.activeLayer()
         if al and isinstance(al, QgsVectorLayer):
             gtype = QgsWkbTypes.geometryType(al.wkbType())
             if gtype == QgsWkbTypes.PointGeometry:
@@ -265,125 +283,187 @@ class IlsLlzDockWidget(QDockWidget):
                     self._widget.cboNavaidLayer.setCurrentIndex(idx)
 
 
-    def get_parameters(self):
-        # Retrieve stored layer IDs and resolve to actual layers
-        navaid_layer_id = self._widget.cboNavaidLayer.currentData()
-        routing_layer_id = self._widget.cboRoutingLayer.currentData()
-        navaid_layer = QgsProject.instance().mapLayer(navaid_layer_id) if navaid_layer_id else None
-        routing_layer = QgsProject.instance().mapLayer(routing_layer_id) if routing_layer_id else None
-        # Basic presence validation with debug logs
-        if not navaid_layer:
-            print("QBRA ILS/LLZ: no navaid layer selected")
-            return None
-        if not routing_layer:
-            print("QBRA ILS/LLZ: no routing layer selected")
-            return None
-        selection = navaid_layer.selectedFeatures()
-        if not selection:
-            print("QBRA ILS/LLZ: no navaid feature selected")
-            return None
-        feat = selection[0]
-        attrs = feat.attributes()
-
-        # Site elevation comes directly from UI numeric parameter
-        site_elev = float(self._widget.spnSiteElev.value())
-
-        # Runway remark: try to find a sensible field; default to RWYXX
-        fields = navaid_layer.fields()
-        rwy_field_candidates = ["runway", "rwy", "thr_rwy"]
-        rwy_idx = -1
-        for name in rwy_field_candidates:
-            idx = fields.indexFromName(name)
-            if idx >= 0:
-                rwy_idx = idx
-                break
-        def _format_runway(val):
-            s = str(val).strip().upper()
-            m = re.search(r"(?<!\d)(\d{1,2})([LRC])?", s)
-            if m:
-                try:
-                    num = int(m.group(1))
-                except Exception:
-                    return "RWYXX"
-                suffix = m.group(2) or ""
-                return f"RWY{num:02d}{suffix}"
-            # Could already be like 'RWY09' or 'RWY09L'
-            m2 = re.search(r"RWY\s*(\d{1,2})([LRC])?", s)
-            if m2:
-                try:
-                    num = int(m2.group(1))
-                except Exception:
-                    return "RWYXX"
-                suffix = m2.group(2) or ""
-                return f"RWY{num:02d}{suffix}"
-            return "RWYXX"
-
-        if rwy_idx < 0:
-            remark = "RWYXX"
-        else:
-            remark = _format_runway(attrs[rwy_idx])
-
-
     def set_calculating(self, calculating: bool) -> None:
         """Enable/disable the Calculate button during background calculation."""
         self._widget.btnCalculate.setEnabled(not calculating)
         self._widget.btnCalculate.setText("Calculating\u2026" if calculating else "Calculate")
 
-        # Apply direction setting to routing points
-        direction = self._widget.btnDirection.property("direction") or "forward"
-        ordered_pts = pts if direction == "forward" else list(reversed(pts))
-        start_point = QgsPoint(ordered_pts[0])
-        end_point = QgsPoint(ordered_pts[-1])
-        azimuth = start_point.azimuth(end_point)
-        print(f"QBRA ILS/LLZ: direction={direction}, azimuth={azimuth}, d0={geom.length()}")
+    def is_omni_mode(self) -> bool:
+        """Return True if the current mode is omnidirectional."""
+        mode_text = self._widget.cboMode.currentText() or "Directional"
+        return mode_text.lower().startswith("omni")
 
-        # Parameters come from UI (facility defaults applied on selection)
-        a = float(self._widget.spnA.value())
-        b = float(self._widget.spnB.value())
-        h = float(self._widget.spnh.value())
-        r = float(self._widget.spnr.value())
-        D = float(self._widget.spnD.value())
-        H = float(self._widget.spnH.value())
-        L = float(self._widget.spnL.value())
-        phi = float(self._widget.spnPhi.value())
-        # Facility type (key) and label
+    def get_omni_parameters(self) -> Optional[dict]:
+        """Extract omnidirectional parameters from the UI.
+
+        Returns:
+            Dict with omni params, or None if no navaid layer/feature is selected.
+        """
+        navaid_layer_id = self._widget.cboNavaidLayer.currentData()
+        navaid_layer = QgsProject.instance().mapLayer(navaid_layer_id) if navaid_layer_id else None
+        if not navaid_layer:
+            self.iface.messageBar().pushMessage("QBRA", "No navaid layer selected", level=MsgWarning)
+            return None
+        if not navaid_layer.selectedFeatureCount():
+            self.iface.messageBar().pushMessage("QBRA", "No navaid feature selected", level=MsgWarning)
+            return None
+
+        site_elev = float(self._widget.spnSiteElev.value())
         facility_key = self._widget.cboFacility.currentData()
         facility_label = self._widget.cboFacility.currentText()
-
-        # Output naming: user-provided name concatenated with facility label
         custom_name = (self._widget.txtOutputName.text() or "").strip()
-        base_name = custom_name if custom_name else remark
-        display_name = f"{base_name} - {facility_label}" if facility_label else base_name
-        mode_text = self._widget.cboMode.currentText() or "Directional"
-        is_omni = mode_text.lower().startswith("omni")
+        display_name = (
+            f"{custom_name} - {facility_label}"
+            if custom_name and facility_label
+            else (custom_name or facility_label or "BRA")
+        )
 
-        params = {
+        return {
             "active_layer": navaid_layer,
-            "azimuth": azimuth,
-            "a": a,
-            "b": b,
-            "h": h,
-            "r": r,
-            "D": D,
-            "H": H,
-            "L": L,
-            "phi": phi,
-            "remark": remark,
-            "direction": direction,
             "site_elev": site_elev,
             "facility_key": facility_key,
             "facility_label": facility_label,
             "display_name": display_name,
+            "omni_r": float(self._widget.spnOmni_r.value()),
+            "omni_alpha": float(self._widget.spnOmni_alpha.value()),
+            "omni_R": float(self._widget.spnOmni_R.value()),
+            "omni_turbine": bool(self._widget.chkOmniTurbine.isChecked()),
+            "omni_j": float(self._widget.spnOmni_j.value()),
+            "omni_h": float(self._widget.spnOmni_h.value()),
         }
 
-        if is_omni:
-            params.update({
-                "omni_r": float(self._widget.spnOmni_r.value()),
-                "omni_alpha": float(self._widget.spnOmni_alpha.value()),
-                "omni_R": float(self._widget.spnOmni_R.value()),
-                "omni_turbine": bool(self._widget.chkOmniTurbine.isChecked()),
-                "omni_j": float(self._widget.spnOmni_j.value()),
-                "omni_h": float(self._widget.spnOmni_h.value()),
-            })
+    def get_parameters(self) -> Optional[BRAParameters]:
+        """Extract and validate all parameters from the UI.
 
-        return params
+        Returns:
+            BRAParameters object with all calculation parameters, or None if validation fails.
+        """
+        try:
+            # Resolve layer IDs to actual layer objects (combos store IDs since fix #24)
+            navaid_layer_id = self._widget.cboNavaidLayer.currentData()
+            routing_layer_id = self._widget.cboRoutingLayer.currentData()
+            navaid_layer = QgsProject.instance().mapLayer(navaid_layer_id) if navaid_layer_id else None
+            routing_layer = QgsProject.instance().mapLayer(routing_layer_id) if routing_layer_id else None
+
+            # Validate layers using ValidationService
+            self._validation_service.validate_layer_selected(navaid_layer, "navaid layer")
+            self._validation_service.validate_layer_selected(routing_layer, "routing layer")
+            self._validation_service.validate_feature_selected(navaid_layer, "navaid layer")
+            self._validation_service.validate_feature_selected(routing_layer, "routing layer")
+            self._validation_service.validate_geometry_vertices(routing_layer, min_vertices=2, layer_name="routing layer")
+
+            # Get selected features
+            feat = navaid_layer.selectedFeatures()[0]
+            attrs = feat.attributes()
+
+            # Site elevation comes directly from UI numeric parameter
+            site_elev = float(self._widget.spnSiteElev.value())
+
+            # Runway remark: find and normalize runway identifier
+            def _format_runway(val):
+                s = str(val).strip().upper()
+                m = re.search(r"(?<!\d)(\d{1,2})([LRC])?", s)
+                if m:
+                    try:
+                        num = int(m.group(1))
+                    except Exception:
+                        return "RWYXX"
+                    suffix = m.group(2) or ""
+                    return f"RWY{num:02d}{suffix}"
+                m2 = re.search(r"RWY\s*(\d{1,2})([LRC])?", s)
+                if m2:
+                    try:
+                        num = int(m2.group(1))
+                    except Exception:
+                        return "RWYXX"
+                    suffix = m2.group(2) or ""
+                    return f"RWY{num:02d}{suffix}"
+                return "RWYXX"
+
+            rwy_idx = self._layer_service.find_field_index(navaid_layer, ["runway", "rwy", "thr_rwy"])
+            if rwy_idx < 0:
+                remark = f"RWY{feat.id()}"
+            else:
+                remark = _format_runway(attrs[rwy_idx])
+
+            # Compute azimuth from selected routing feature
+            routing_feat = routing_layer.selectedFeatures()[0]
+            geom = routing_feat.geometry()
+
+            # Get vertices based on geometry type
+            if geom.isMultipart():
+                pts = geom.asMultiPolyline()[0]
+            else:
+                pts = geom.asPolyline()
+
+            # Apply direction setting to routing points
+            direction = self._widget.btnDirection.property("direction") or "forward"
+            ordered_pts = pts if direction == "forward" else list(reversed(pts))
+            # QgsPoint(x, y) is required for azimuth(); QgsPointXY does not have azimuth()
+            p0 = ordered_pts[0]
+            p1 = ordered_pts[-1]
+            start_point = QgsPoint(p0.x(), p0.y())
+            end_point = QgsPoint(p1.x(), p1.y())
+            # QgsPoint.azimuth() returns [-180, 180]; normalize to [0, 360)
+            azimuth = start_point.azimuth(end_point) % 360
+
+            logger.debug(
+                "Calculated azimuth from routing geometry: direction=%s, azimuth=%.2f, distance=%.2f",
+                direction, azimuth, geom.length()
+            )
+
+            # Parameters come from UI (facility defaults applied on selection)
+            a = float(self._widget.spnA.value())
+            b = float(self._widget.spnB.value())
+            h = float(self._widget.spnh.value())
+            r = float(self._widget.spnr.value())
+            D = float(self._widget.spnD.value())
+            H = float(self._widget.spnH.value())
+            L = float(self._widget.spnL.value())
+            phi = float(self._widget.spnPhi.value())
+
+            # Facility type (key) and label
+            facility_key = self._widget.cboFacility.currentData()
+            facility_label = self._widget.cboFacility.currentText()
+
+            # Output naming: user-provided name concatenated with facility label
+            custom_name = (self._widget.txtOutputName.text() or "").strip()
+            base_name = custom_name if custom_name else remark
+            display_name = f"{base_name} - {facility_label}" if facility_label else base_name
+
+            # Create BRAParameters (with built-in validation)
+            return BRAParameters(
+                active_layer=navaid_layer,
+                azimuth=azimuth,
+                a=a,
+                b=b,
+                h=h,
+                r=r,
+                D=D,
+                H=H,
+                L=L,
+                phi=phi,
+                site_elev=site_elev,
+                remark=remark,
+                direction=direction,
+                facility_key=facility_key,
+                facility_label=facility_label,
+                display_name=display_name,
+            )
+
+        except (ValidationError, ValueError) as e:
+            logger.warning("Parameter validation failed: %s", e)
+            self.iface.messageBar().pushMessage(
+                "QBRA",
+                str(e),
+                level=MsgWarning,
+            )
+            return None
+        except Exception as e:
+            logger.error("Unexpected error while extracting parameters: %s", e, exc_info=True)
+            self.iface.messageBar().pushMessage(
+                "QBRA",
+                f"Unexpected error: {e}",
+                level=MsgCritical,
+            )
+            return None
