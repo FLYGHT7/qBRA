@@ -16,10 +16,10 @@ else:
 @dataclass(frozen=True)
 class FeatureDefinition:
     """Definition for a single BRA feature polygon.
-    
+
     This dataclass provides a declarative way to define polygon features,
     eliminating code duplication in the feature creation process.
-    
+
     Attributes:
         id: Unique identifier for the feature
         area: Area type ("base", "left level", "right level", "slope", "wall")
@@ -27,13 +27,13 @@ class FeatureDefinition:
         area_name: Display name for the feature
         geometry_points: List of QgsPoint for polygon vertices
     """
-    
+
     id: int
     area: str
     max_elev: str
     area_name: str
     geometry_points: List[QgsPoint]
-    
+
     def __post_init__(self) -> None:
         """Validate feature definition."""
         if self.id < 1:
