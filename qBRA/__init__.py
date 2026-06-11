@@ -3,12 +3,12 @@
 from typing import Any
 
 
-def classFactory(iface: Any) -> "QbraPlugin":
+def classFactory(iface: Any) -> "QbraPlugin":  # noqa: F821
     """QGIS plugin factory function.
-    
+
     Args:
         iface: QGIS interface object.
-        
+
     Returns:
         Instance of QbraPlugin.
     """

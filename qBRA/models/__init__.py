@@ -11,6 +11,8 @@ __all__ = [
 ]
 
 # Lazy imports to avoid QGIS dependency during test discovery
+
+
 def __getattr__(name: str):
     """Lazy import of models to avoid QGIS dependency during test collection."""
     if name == "BRAParameters":

@@ -4,15 +4,15 @@ This module defines typed dataclasses for all parameter structures used in
 ILS/LLZ BRA calculations, replacing Dict[str, Any] with strongly-typed models.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Union
+from dataclasses import dataclass
+from typing import Optional
 from qgis.core import QgsVectorLayer
 
 
 @dataclass(frozen=True)
 class FacilityDefaults:
     """Default parameter values for a facility type.
-    
+
     Attributes:
         a: Distance from navaid to threshold (meters). Optional if depends on routing.
         b: Distance behind threshold (meters)
@@ -33,13 +33,13 @@ class FacilityDefaults:
     a: Optional[float] = None
     r: Optional[float] = None
     r_expr: Optional[str] = None
-    
+
     def __post_init__(self) -> None:
         """Validate facility defaults."""
         # Validate that either r or r_expr is provided, but not both
         if self.r is not None and self.r_expr is not None:
             raise ValueError("Cannot specify both 'r' and 'r_expr'")
-        
+
         # Validate non-negative values
         if self.b < 0:
             raise ValueError(f"b must be non-negative, got {self.b}")
@@ -62,10 +62,10 @@ class FacilityDefaults:
 @dataclass(frozen=True)
 class FacilityConfig:
     """Configuration for a facility type (LOC, LOCII, GP, DME, etc.).
-    
+
     Attributes:
         key: Short identifier (e.g., "LOC", "LOCII")
-        label: Human-readable label (e.g., "ILS LLZ – single frequency")
+        label: Human-readable label (e.g., "ILS LLZ â€“ single frequency")
         a_depends_on_threshold: If True, 'a' is calculated from routing geometry
         defaults: Default parameter values for this facility
     """
@@ -73,21 +73,21 @@ class FacilityConfig:
     label: str
     a_depends_on_threshold: bool
     defaults: FacilityDefaults
-    
+
     def __post_init__(self) -> None:
         """Validate facility configuration."""
         if not self.key:
             raise ValueError("Facility key cannot be empty")
         if not self.label:
             raise ValueError("Facility label cannot be empty")
-        
+
         # If a_depends_on_threshold is True, 'a' should not be in defaults
         if self.a_depends_on_threshold and self.defaults.a is not None:
             raise ValueError(
                 f"Facility {self.key}: when a_depends_on_threshold is True, "
                 f"defaults should not specify 'a'"
             )
-        
+
         # If a_depends_on_threshold is False, 'a' must be in defaults
         if not self.a_depends_on_threshold and self.defaults.a is None:
             raise ValueError(
@@ -99,13 +99,13 @@ class FacilityConfig:
 @dataclass
 class BRAParameters:
     """Parameters for Building Restriction Area (BRA) calculation.
-    
+
     This replaces the Dict[str, Any] parameter structure with a strongly-typed
     dataclass that includes validation.
-    
+
     Attributes:
         active_layer: QGIS vector layer with navaid feature
-        azimuth: Direction angle in degrees (0–360, exclusive)
+        azimuth: Direction angle in degrees (0â€“360, exclusive)
         a: Distance from navaid to threshold (meters)
         b: Distance behind threshold (meters)
         h: Maximum obstacle height (meters)
@@ -137,13 +137,16 @@ class BRAParameters:
     facility_key: str
     facility_label: str
     display_name: Optional[str] = None
-    
+
     def __post_init__(self) -> None:
         """Validate BRA parameters and compute derived values."""
         # Validate azimuth (must be normalized to [0, 360) before construction)
         if not (0 <= self.azimuth < 360):
-            raise ValueError(f"azimuth must be in [0, 360), got {self.azimuth} — normalize with '% 360' before passing")
-        
+            raise ValueError(
+                f"azimuth must be in [0, 360), got {self.azimuth}"
+                " â€” normalize with '% 360' before passing"
+            )
+
         # Validate non-negative values
         if self.a < 0:
             raise ValueError(f"a must be non-negative, got {self.a}")
@@ -161,11 +164,11 @@ class BRAParameters:
             raise ValueError(f"L must be non-negative, got {self.L}")
         if not (0 <= self.phi <= 180):
             raise ValueError(f"phi must be between 0 and 180 degrees, got {self.phi}")
-        
+
         # Validate direction
         if self.direction not in ("forward", "backward"):
             raise ValueError(f"direction must be 'forward' or 'backward', got {self.direction}")
-        
+
         # Validate strings are not empty
         if not self.remark:
             raise ValueError("remark cannot be empty")
@@ -173,18 +176,18 @@ class BRAParameters:
             raise ValueError("facility_key cannot be empty")
         if not self.facility_label:
             raise ValueError("facility_label cannot be empty")
-        
+
         # Compute display_name if not provided
         if self.display_name is None:
             object.__setattr__(
-                self, 
-                'display_name', 
+                self,
+                'display_name',
                 f"{self.remark} - {self.facility_label}" if self.facility_label else self.remark
             )
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary format for backward compatibility.
-        
+
         Returns:
             Dictionary with all parameters (legacy format)
         """

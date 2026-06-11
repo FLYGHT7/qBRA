@@ -14,17 +14,18 @@ from .exceptions import LayerNotFoundError
 from .workers.bra_worker import BRAWorker
 from .modules.ils_llz_logic import build_layers_omni
 from .utils.logging_config import get_logger
-from .utils.qt_compat import MsgSuccess, MsgWarning, MsgCritical
+from .utils.qt_compat import MsgSuccess, MsgCritical
 
 # Module logger
 logger = get_logger(__name__)
 
+
 class QbraPlugin(QObject):
     """Main plugin class for qBRA - Building Restriction Areas."""
-    
+
     def __init__(self, iface: Any) -> None:
         """Initialize the plugin.
-        
+
         Args:
             iface: QGIS interface object.
         """
@@ -93,7 +94,7 @@ class QbraPlugin(QObject):
         self._dock.raise_()
 
     def _on_calculate(self) -> None:
-        """Handle calculate button click — dispatches to omni or directional calculation."""
+        """Handle calculate button click â€” dispatches to omni or directional calculation."""
         if self._worker and self._worker.isRunning():
             return  # BUG-02: ignore re-entrant calls while a calculation is in flight
 
@@ -147,5 +148,5 @@ class QbraPlugin(QObject):
         self.iface.messageBar().pushMessage(
             "QBRA",
             f"Calculation error: {message}",
-level=MsgCritical
+            level=MsgCritical
         )
