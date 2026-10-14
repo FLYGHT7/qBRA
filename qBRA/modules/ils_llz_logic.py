@@ -3,7 +3,7 @@
 This module contains the core geometry functions for computing Building
 Restriction Areas (BRA) around ILS/LLZ navaids.  The formulas and polygon
 construction logic are kept identical to the legacy
-``ILS_LLZ_single_frequency.py`` script — do NOT modify the geometry
+``ILS_LLZ_single_frequency.py`` script â€” do NOT modify the geometry
 calculations without a corresponding aeronautical review.
 
 Public API
@@ -25,7 +25,6 @@ from qgis.core import (
     QgsFeature,
     QgsGeometry,
     QgsGeometryUtils,
-    QgsProject,
     QgsPoint,
     QgsPointXY,
     QgsPolygon,
@@ -49,21 +48,21 @@ def create_feature(
     geometry: QgsGeometry,
 ) -> QgsFeature:
     """Create a BRA feature from a definition and parameters.
-    
+
     This function eliminates code duplication by providing a single place
     to create features with consistent attributes.
-    
+
     Args:
         definition: FeatureDefinition with id, area, max_elev, area_name
         params: BRAParameters with all calculation parameters
         geometry: QgsGeometry for the feature polygon
-        
+
     Returns:
         QgsFeature with geometry and attributes set
     """
     # Facility label preferred for 'type' attribute (falls back to key)
     type_value = params.facility_label or params.facility_key or ""
-    
+
     feature = QgsFeature()
     feature.setGeometry(geometry)
     feature.setAttributes([
@@ -81,20 +80,20 @@ def create_feature(
         str(params.phi),
         type_value,
     ])
-    
+
     return feature
 
 
 def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma: no cover
     """Build BRA (Building Restriction Areas) vector layer with polygons.
-    
+
     Args:
         iface: QGIS interface object
         params: BRAParameters dataclass with all calculation parameters
-    
+
     Returns:
         QgsVectorLayer with BRA polygon features
-        
+
     Raises:
         BRACalculationError: If feature selection or geometry calculation fails
     """
@@ -114,11 +113,11 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
     # Helper to add Z
     def pz(point: Union[QgsPoint, QgsPointXY], z: float) -> QgsPoint:
         """Add Z coordinate to a point.
-        
+
         Args:
             point: 2D or 3D point
             z: Z elevation value
-            
+
         Returns:
             QgsPoint with Z coordinate set
         """
@@ -136,22 +135,19 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
     L = params.L
     phi = params.phi
     azimuth = params.azimuth
-    remark = params.remark
     display_name = params.display_name or params.remark
     site_elev = params.site_elev
+    _type_value = params.facility_label or params.facility_key or ""
 
     side_elev = site_elev + H
 
-    # Geometry reference — all points in the map CRS:
-    #   pt_threshold             navaid projected forward  by `a` (threshold point)
-    #   pt_back                  navaid projected backward by `b`
-    #   pt_ahead_left/right      threshold offset laterally by half-width `D`
-    #   pt_back_left/right       back-center offset laterally by `D`
-    #   pt_lateral_left/right    back-center offset laterally by full lateral distance `L`
-    #   pt_arc_ref               navaid projected forward by `r` (arc centre-line reference)
-    #   pt_*_projected           ray endpoints used for line / circle intersection
-    #   pt_arc_left/right        diverging line ∩ circle(radius=r)
-    #   pt_diverge_left/right    diverging line ∩ lateral boundary
+    # Geometry reference â€” all points in the map CRS:
+    #   pt_threshold          navaid projected forward  by `a` (threshold point)
+    #   pt_back               navaid projected backward by `b`
+    #   pt_ahead_left/right   threshold offset laterally by half-width `D`
+    #   pt_back_left/right    back-center offset laterally by `D`
+    #   pt_arc_ref            navaid projected forward by `r` (arc centre-line reference)
+    #   pt_arc_left/right     diverging line âˆ© circle(radius=r)
 
     pt_threshold = p_geom.project(a, azimuth)
     pt_back      = p_geom.project(b, azimuth - 180)
@@ -161,35 +157,20 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
     pt_back_left   = pt_back.project(D, azimuth - 90)
     pt_back_right  = pt_back.project(D, azimuth + 90)
 
-    pt_lateral_left  = pt_back.project(L, azimuth - 90)
-    pt_lateral_right = pt_back.project(L, azimuth + 90)
+    # Short aliases used in wall face constructions
+    pt_al, pt_ar = pt_ahead_left, pt_ahead_right
+    pt_bl, pt_br = pt_back_left,  pt_back_right
 
     pt_arc_ref = p_geom.project(r, azimuth)
 
-    # Projected ray endpoints for intersection calculations
-    pt_lateral_left_projected  = pt_lateral_left.project(PROJECTION_DISTANCE, azimuth)
-    pt_ahead_left_projected    = pt_ahead_left.project(PROJECTION_DISTANCE, azimuth - phi)
+    pt_ahead_left_projected  = pt_ahead_left.project(PROJECTION_DISTANCE, azimuth - phi)
+    pt_ahead_right_projected = pt_ahead_right.project(PROJECTION_DISTANCE, azimuth + phi)
 
-    pt_lateral_right_projected = pt_lateral_right.project(PROJECTION_DISTANCE, azimuth)
-    pt_ahead_right_projected   = pt_ahead_right.project(PROJECTION_DISTANCE, azimuth + phi)
-
-    # Diverging line ∩ circle(r)
+    # Diverging line âˆ© circle(r)
     pt_arc_left  = QgsPointXY(QgsGeometryUtils.lineCircleIntersection(
         p_geom, r, pt_ahead_left, pt_ahead_left_projected, pt_arc_ref)[1])
     pt_arc_right = QgsPointXY(QgsGeometryUtils.lineCircleIntersection(
         p_geom, r, pt_ahead_right, pt_ahead_right_projected, pt_arc_ref)[1])
-
-    # Diverging line ∩ lateral boundary
-    pt_diverge_left = QgsPointXY(
-        QgsGeometryUtils.segmentIntersection(
-            QgsPoint(pt_ahead_left),  QgsPoint(pt_ahead_left_projected),
-            QgsPoint(pt_lateral_left), QgsPoint(pt_lateral_left_projected))[1]
-    )
-    pt_diverge_right = QgsPointXY(
-        QgsGeometryUtils.segmentIntersection(
-            QgsPoint(pt_ahead_right),  QgsPoint(pt_ahead_right_projected),
-            QgsPoint(pt_lateral_right), QgsPoint(pt_lateral_right_projected))[1]
-    )
 
     # Memory layer for polygons
     z_layer = QgsVectorLayer(CRS_TEMPLATE_PREFIX + map_srid, f"{display_name} {LAYER_NAME_SUFFIX}", "memory")
@@ -212,20 +193,6 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
     z_layer.dataProvider().addAttributes(fields)
     z_layer.updateFields()
     pr = z_layer.dataProvider()
-
-    # Build all feature geometries (preserving exact calculations from legacy script)
-    
-    # Base geometry
-    base_points = [pz(pt_back_left, site_elev), pz(pt_back_right, site_elev), pz(pt_ahead_right, site_elev), pz(pt_ahead_left, site_elev), pz(pt_back_left, site_elev)]
-    base_geom = QgsGeometry(QgsPolygon(QgsLineString(base_points), rings=[]))
-
-    # Left level geometry
-    llevel_points = [pz(pt_lateral_left, side_elev), pz(pt_back_left, side_elev), pz(pt_ahead_left, side_elev), pz(pt_diverge_left, side_elev), pz(pt_lateral_left, side_elev)]
-    llevel_geom = QgsGeometry(QgsPolygon(QgsLineString(llevel_points), rings=[]))
-
-    # Right level geometry
-    rlevel_points = [pz(pt_back_right, side_elev), pz(pt_lateral_right, side_elev), pz(pt_diverge_right, side_elev), pz(pt_ahead_right, side_elev), pz(pt_back_right, side_elev)]
-    rlevel_geom = QgsGeometry(QgsPolygon(QgsLineString(rlevel_points), rings=[]))
 
     # Slope geometry (with curve + arc)
     from qgis.core import QgsCircularString
@@ -287,7 +254,8 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
     ])
     pr.addFeatures([seg])
 
-    wall2 = [pz(pt_al, site_elev), pz(pt_al, side_elev), pz(pt_bl, side_elev), pz(pt_bl, site_elev), pz(pt_al, site_elev)]
+    wall2 = [pz(pt_al, site_elev), pz(pt_al, side_elev),
+             pz(pt_bl, side_elev), pz(pt_bl, site_elev), pz(pt_al, site_elev)]
     seg = QgsFeature()
     seg.setGeometry(QgsPolygon(QgsLineString(wall2), rings=[]))
     seg.setAttributes([
@@ -307,7 +275,8 @@ def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:  # pragma
     ])
     pr.addFeatures([seg])
 
-    wall3 = [pz(pt_ar, site_elev), pz(pt_ar, side_elev), pz(pt_br, side_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev)]
+    wall3 = [pz(pt_ar, site_elev), pz(pt_ar, side_elev),
+             pz(pt_br, side_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev)]
     seg = QgsFeature()
     seg.setGeometry(QgsPolygon(QgsLineString(wall3), rings=[]))
     seg.setAttributes([

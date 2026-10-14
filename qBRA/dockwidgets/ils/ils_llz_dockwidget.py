@@ -20,10 +20,11 @@ logger = get_logger(__name__)
 
 UI_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ui", "ils", "ils_llz_panel.ui")
 
+
 class IlsLlzDockWidget(QDockWidget):
     calculateRequested = pyqtSignal()
     closedRequested = pyqtSignal()
-    
+
     _facility_defs_dir: Dict[str, Tuple]
     _facility_defs_omni: Dict[str, Tuple]
     _validation_service: ValidationService
@@ -31,17 +32,17 @@ class IlsLlzDockWidget(QDockWidget):
 
     def __init__(self, iface_: Any) -> None:
         """Initialize the ILS/LLZ dock widget.
-        
+
         Args:
             iface_: QGIS interface object
         """
         super().__init__("QBRA ILS/LLZ")
         self.iface = iface_
-        
+
         # Initialize services (dependency injection)
         self._validation_service = ValidationService()
         self._layer_service = LayerService(iface_)
-        
+
         self.setAllowedAreas(LeftDockWidgetArea | RightDockWidgetArea)
         self.setObjectName("IlsLlzDockWidget")
         self._widget = uic.loadUi(UI_PATH)
@@ -52,7 +53,7 @@ class IlsLlzDockWidget(QDockWidget):
 
     def defaultArea(self) -> Qt.DockWidgetArea:
         """Return the default dock widget area.
-        
+
         Returns:
             The right dock widget area
         """
@@ -71,10 +72,14 @@ class IlsLlzDockWidget(QDockWidget):
         # Directional facilities
         self._facility_defs_dir = {
             # key: (label, a_depends_threshold, defaults)
-            "LOC": ("ILS LLZ – single frequency", True, {"b": 500, "h": 70, "D": 500, "H": 10, "L": 2300, "phi": 30, "r_expr": "a+6000"}),
-            "LOCII": ("ILS LLZ – dual frequency", True, {"b": 500, "h": 70, "D": 500, "H": 20, "L": 1500, "phi": 20, "r_expr": "a+6000"}),
-            "GP": ("ILS GP M-Type (dual)", False, {"a": 800, "b": 50, "h": 70, "D": 250, "H": 5, "L": 325, "phi": 10, "r": 6000}),
-            "DME": ("DME (directional)", True, {"b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r_expr": "a+6000"}),
+            "LOC": ("ILS LLZ â€“ single frequency", True,
+                    {"b": 500, "h": 70, "D": 500, "H": 10, "L": 2300, "phi": 30, "r_expr": "a+6000"}),
+            "LOCII": ("ILS LLZ â€“ dual frequency", True,
+                      {"b": 500, "h": 70, "D": 500, "H": 20, "L": 1500, "phi": 20, "r_expr": "a+6000"}),
+            "GP": ("ILS GP M-Type (dual)", False,
+                   {"a": 800, "b": 50, "h": 70, "D": 250, "H": 5, "L": 325, "phi": 10, "r": 6000}),
+            "DME": ("DME (directional)", True,
+                    {"b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r_expr": "a+6000"}),
         }
         # Omnidirectional facilities presets (initial set)
         self._facility_defs_omni = {
@@ -82,7 +87,8 @@ class IlsLlzDockWidget(QDockWidget):
             "OMNI_DME_N": ("DME N (omnidirectional)", {"r": 300, "alpha": 1.0, "R": 3000}),
             "OMNI_CVOR": ("CVOR (omnidirectional)", {"r": 600, "alpha": 1.0, "R": 3000, "j": 15000, "h": 52}),
             "OMNI_DVOR": ("DVOR (omnidirectional)", {"r": 600, "alpha": 1.0, "R": 3000, "j": 10000, "h": 52}),
-            "OMNI_DF": ("Direction Finder (omnidirectional)", {"r": 500, "alpha": 1.0, "R": 3000, "j": 10000, "h": 52}),
+            "OMNI_DF": ("Direction Finder (omnidirectional)",
+                        {"r": 500, "alpha": 1.0, "R": 3000, "j": 10000, "h": 52}),
             "OMNI_MARKERS": ("Markers (omnidirectional)", {"r": 50, "alpha": 20.0, "R": 200}),
             "OMNI_NDB": ("NDB (omnidirectional)", {"r": 200, "alpha": 5.0, "R": 1000}),
             "OMNI_GBAS_REF": ("GBAS ground Reference receiver", {"r": 400, "alpha": 3.0, "R": 3000}),
@@ -173,7 +179,7 @@ class IlsLlzDockWidget(QDockWidget):
 
             direction = self._widget.btnDirection.property("direction") or "forward"
             pick = pts[0] if direction == "forward" else pts[-1]
-            # Both pick and npt are QgsPointXY — use QgsPointXY.distance() directly
+            # Both pick and npt are QgsPointXY â€” use QgsPointXY.distance() directly
             npt = nfeat.geometry().asPoint()
             return pick.distance(npt)
 
@@ -196,7 +202,7 @@ class IlsLlzDockWidget(QDockWidget):
 
         _label, _a_dep, defs = entry
         # A: if explicitly present in defaults, set it; otherwise estimate from layers.
-        # The estimation may return 0.0 on initial load (no layers yet) — that is fine.
+        # The estimation may return 0.0 on initial load (no layers yet) â€” that is fine.
         a_default = defs.get("a")
         if a_default is not None:
             self._widget.spnA.setValue(float(a_default))
@@ -257,6 +263,7 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget.cboRoutingLayer.clear()
         # Collect layers via the layer tree to include layers inside groups
         root = QgsProject.instance().layerTreeRoot()
+
         def visit(node):
             for child in node.children():
                 if child.nodeType() == child.NodeLayer:
@@ -281,7 +288,6 @@ class IlsLlzDockWidget(QDockWidget):
                 idx = self._widget.cboNavaidLayer.findText(al.name())
                 if idx >= 0:
                     self._widget.cboNavaidLayer.setCurrentIndex(idx)
-
 
     def set_calculating(self, calculating: bool) -> None:
         """Enable/disable the Calculate button during background calculation."""
@@ -350,7 +356,8 @@ class IlsLlzDockWidget(QDockWidget):
             self._validation_service.validate_layer_selected(routing_layer, "routing layer")
             self._validation_service.validate_feature_selected(navaid_layer, "navaid layer")
             self._validation_service.validate_feature_selected(routing_layer, "routing layer")
-            self._validation_service.validate_geometry_vertices(routing_layer, min_vertices=2, layer_name="routing layer")
+            self._validation_service.validate_geometry_vertices(
+                routing_layer, min_vertices=2, layer_name="routing layer")
 
             # Get selected features
             feat = navaid_layer.selectedFeatures()[0]

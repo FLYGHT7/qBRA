@@ -12,14 +12,14 @@ from ..exceptions import BRAValidationError
 
 class ValidationError(BRAValidationError):
     """Raised when validation fails.
-    
+
     This is an alias for BRAValidationError maintained for backward compatibility
     and to provide a more specific type for validation-related errors.
     """
-    
+
     def __init__(self, message: str, field: Optional[str] = None) -> None:
         """Initialize validation error.
-        
+
         Args:
             message: Human-readable error message
             field: Optional field name that failed validation
@@ -30,22 +30,22 @@ class ValidationError(BRAValidationError):
 
 class ValidationService:
     """Service for validating layers, features, and parameters.
-    
+
     This service contains pure validation logic with no side effects.
     All methods are static for easy testing and reuse.
     """
-    
+
     @staticmethod
     def validate_layer_selected(
         layer: Optional[Any],
         layer_name: str = "layer"
     ) -> None:
         """Validate that a layer is selected.
-        
+
         Args:
             layer: Layer object to validate
             layer_name: Name of the layer for error message
-            
+
         Raises:
             ValidationError: If layer is not selected
         """
@@ -54,7 +54,7 @@ class ValidationService:
                 f"No {layer_name} selected",
                 field=layer_name
             )
-    
+
     @staticmethod
     def validate_layer_type(
         layer: QgsVectorLayer,
@@ -62,12 +62,12 @@ class ValidationService:
         layer_name: str = "layer"
     ) -> None:
         """Validate that a layer has the expected geometry type.
-        
+
         Args:
             layer: Vector layer to validate
             expected_type: Expected geometry type (e.g., QgsWkbTypes.PointGeometry)
             layer_name: Name of the layer for error message
-            
+
         Raises:
             ValidationError: If layer has wrong geometry type
         """
@@ -76,7 +76,7 @@ class ValidationService:
                 f"{layer_name} is not a vector layer",
                 field=layer_name
             )
-        
+
         actual_type = QgsWkbTypes.geometryType(layer.wkbType())
         if actual_type != expected_type:
             type_names = {
@@ -86,23 +86,23 @@ class ValidationService:
             }
             expected_name = type_names.get(expected_type, str(expected_type))
             actual_name = type_names.get(actual_type, str(actual_type))
-            
+
             raise ValidationError(
                 f"{layer_name} must be {expected_name} layer, got {actual_name}",
                 field=layer_name
             )
-    
+
     @staticmethod
     def validate_feature_selected(
         layer: QgsVectorLayer,
         layer_name: str = "layer"
     ) -> None:
         """Validate that layer has at least one selected feature.
-        
+
         Args:
             layer: Vector layer to check
             layer_name: Name of the layer for error message
-            
+
         Raises:
             ValidationError: If no features are selected
         """
@@ -111,7 +111,7 @@ class ValidationService:
                 f"No feature selected on {layer_name}",
                 field=layer_name
             )
-    
+
     @staticmethod
     def validate_geometry_vertices(
         layer: QgsVectorLayer,
@@ -119,12 +119,12 @@ class ValidationService:
         layer_name: str = "layer"
     ) -> None:
         """Validate that selected feature has sufficient vertices.
-        
+
         Args:
             layer: Vector layer with selected feature
             min_vertices: Minimum number of vertices required
             layer_name: Name of the layer for error message
-            
+
         Raises:
             ValidationError: If geometry has insufficient vertices
         """
@@ -134,10 +134,10 @@ class ValidationService:
                 f"No feature selected on {layer_name}",
                 field=layer_name
             )
-        
+
         feature = selected[0]
         geom = feature.geometry()
-        
+
         # Get vertices based on geometry type
         if geom.isMultipart():
             parts = geom.asMultiPolyline() if geom.type() == QgsWkbTypes.LineGeometry else geom.asMultiPolygon()
@@ -149,13 +149,14 @@ class ValidationService:
             vertices = parts[0]
         else:
             vertices = geom.asPolyline() if geom.type() == QgsWkbTypes.LineGeometry else geom.asPolygon()
-        
+
         if not vertices or len(vertices) < min_vertices:
             raise ValidationError(
-                f"{layer_name} geometry must have at least {min_vertices} vertices, got {len(vertices) if vertices else 0}",
+                f"{layer_name} geometry must have at least {min_vertices} vertices,"
+                f" got {len(vertices) if vertices else 0}",
                 field=layer_name
             )
-    
+
     @staticmethod
     def validate_positive_number(
         value: float,
@@ -164,13 +165,13 @@ class ValidationService:
         exclusive: bool = True
     ) -> None:
         """Validate that a number is positive.
-        
+
         Args:
             value: Number to validate
             field_name: Name of the field for error message
             min_value: Minimum allowed value
             exclusive: If True, value must be > min_value; if False, value must be >= min_value
-            
+
         Raises:
             ValidationError: If value is not positive
         """
@@ -186,7 +187,7 @@ class ValidationService:
                     f"{field_name} must be at least {min_value}, got {value}",
                     field=field_name
                 )
-    
+
     @staticmethod
     def validate_angle_range(
         value: float,
@@ -197,7 +198,7 @@ class ValidationService:
         inclusive_max: bool = False
     ) -> None:
         """Validate that an angle is within range.
-        
+
         Args:
             value: Angle value to validate (degrees)
             field_name: Name of the field for error message
@@ -205,13 +206,13 @@ class ValidationService:
             max_angle: Maximum angle (degrees)
             inclusive_min: If True, min_angle is inclusive
             inclusive_max: If True, max_angle is inclusive
-            
+
         Raises:
             ValidationError: If angle is out of range
         """
         min_ok = value >= min_angle if inclusive_min else value > min_angle
         max_ok = value <= max_angle if inclusive_max else value < max_angle
-        
+
         if not (min_ok and max_ok):
             min_bracket = "[" if inclusive_min else "("
             max_bracket = "]" if inclusive_max else ")"
@@ -219,14 +220,14 @@ class ValidationService:
                 f"{field_name} must be in range {min_bracket}{min_angle}, {max_angle}{max_bracket}, got {value}",
                 field=field_name
             )
-    
+
     @staticmethod
     def validate_direction(value: str) -> None:
         """Validate routing direction value.
-        
+
         Args:
             value: Direction string to validate
-            
+
         Raises:
             ValidationError: If direction is invalid
         """
@@ -236,15 +237,15 @@ class ValidationService:
                 f"direction must be one of {valid_directions}, got '{value}'",
                 field="direction"
             )
-    
+
     @staticmethod
     def validate_non_empty_string(value: str, field_name: str) -> None:
         """Validate that a string is not empty.
-        
+
         Args:
             value: String to validate
             field_name: Name of the field for error message
-            
+
         Raises:
             ValidationError: If string is empty
         """

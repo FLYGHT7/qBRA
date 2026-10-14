@@ -9,6 +9,7 @@ that all qBRA imports in test files succeed without a real QGIS installation.
 """
 
 import sys
+from typing import Any
 from unittest.mock import Mock, MagicMock
 
 # ============================================================================
@@ -33,6 +34,7 @@ except ImportError:
         PolygonGeometry = 2
         UnknownGeometry = 3
         NullGeometry = 4
+        GeometryType = int  # type alias used in annotations
 
         @staticmethod
         def geometryType(wkb_type: int) -> int:
